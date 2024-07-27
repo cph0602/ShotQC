@@ -39,7 +39,8 @@ class ParamCut(Instruction):
             temp = basis
         else:
             temp = basis.value
-        super().__init__("param_cut", 1, 0, [mode, temp], label)
+        super().__init__("param_cut", 1, 0, [mode, temp])
+        self.label = label
     
     def _define(self):
         circuit = QuantumCircuit(1, name=self.name)
