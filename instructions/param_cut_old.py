@@ -44,4 +44,23 @@ class ParamCut(Instruction):
     
     def _define(self):
         circuit = QuantumCircuit(1, name=self.name)
+        mode, basis = self.params
+        if mode == 'm':
+            if basis == 0: # X basis
+                circuit.h(0)
+            elif basis == 1:
+                circuit.sdg(1)
+                circuit.h(1)
+        elif mode == 'p':
+            if basis == 0: # prepare +
+                circuit.h(0)
+            elif basis == 1: # prepare -
+                circuit.x(0)
+                circuit.h(0)
+            elif basis == 2: # prepare +i
+                circuit.rx(-pi/2, 0)
+            elif basis == 3: # prepare -i
+                circuit.rx(pi/2, 0)
+            elif basis == 5: # prepare 1
+                circuit.x(0)
         self.definition = circuit
