@@ -2,6 +2,7 @@ from instructions.param_cut import ParamCut, Prep_Basis, Meas_Basis
 from qiskit import QuantumCircuit
 from qiskit.circuit import Instruction
 from shotqc.main import ShotQC
+from shotqc.helper import circuit_stripping
 
 subcircuit_1 = QuantumCircuit(3)
 subcircuit_1.cx(0,1)
@@ -19,7 +20,8 @@ print(subcircuit_2)
 
 print("=============================================")
 
+
 subcircuits = [subcircuit_1, subcircuit_2]
-shotqc = ShotQC(subcircuits=subcircuits, verbose=True)
+shotqc = ShotQC(subcircuits=subcircuits, name="mycircuit", verbose=True)
 shotqc.print_info()
-shotqc.run()
+shotqc.execute(100, 9000)
