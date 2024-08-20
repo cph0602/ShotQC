@@ -41,8 +41,6 @@ def initialize_counts(data_folder, subcircuits, subcircuits_entries):
                 counts = {}
                 for bitstring in itertools.product('01', repeat = subcircuit.num_qubits):
                     counts[''.join(bitstring)] = 0
-                if job == 0:
-                    print(counts)
                 pickle.dump(
                     {
                         "total_shots": 0,

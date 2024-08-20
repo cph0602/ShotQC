@@ -28,12 +28,16 @@ def run_samples(subcircuits: List[QuantumCircuit], subcircuits_entries: List[Lis
     else:
         raise Exception("Invalid SD_mode")
     stripped_subcircuits = [circuit_stripping(subcircuits[i]) for i in range(len(subcircuits))]
+    entry_dict = []
+    for subcircuit_entries in subcircuits_entries:
+        sub_entry = {subcircuit_entries[i]: i for i in range(len(subcircuit_entries))}
+        entry_dict.append(sub_entry)
     pickle.dump(
         {
             "subcircuits": stripped_subcircuits,
             "run_mode": run_mode,
             "SD_dist": SD_dist,
-            "subcircuits_entries": subcircuits_entries
+            "entry_dict": entry_dict,
         },
         open("%s/meta_info.pckl" % data_folder, "wb"),
     )

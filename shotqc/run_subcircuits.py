@@ -17,7 +17,7 @@ if __name__ == "__main__":
     subcircuit = meta_info["subcircuits"][subcircuit_idx]
     run_mode = meta_info["run_mode"]
     SD_dist = meta_info["SD_dist"][subcircuit_idx]
-    subcircuit_entries = meta_info["subcircuits_entries"][subcircuit_idx]
+    subcircuit_entries = list(meta_info["entry_dict"][subcircuit_idx].keys())
     rank_jobs = pickle.load(
         open("%s/rank_%d.pckl" % (args.data_folder, args.rank), "rb")
     )
@@ -48,6 +48,7 @@ if __name__ == "__main__":
             },
             open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
         )
+    subprocess.run(["rm", "%s/rank_%d.pckl" % (args.data_folder, args.rank)])
 
         
         
