@@ -1,5 +1,5 @@
 from qiskit import QuantumCircuit
-import os, subprocess
+import os, subprocess, random
 from typing import List
 import itertools
 from shotqc.executor import run_samples
@@ -43,7 +43,17 @@ class ShotQC():
         self._run_prior_samples(num_shots_prior)
         # if use_params:
         #     self._optimize_parameters()
-        postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, [[0 for _ in range(24)] for x in range(self.info["num_cuts"])])
+        
+    
+    def reconstruct(self):
+        if self.verbose:
+            print("--> Building output probability")
+        params = []
+        for i in range(8):
+            params.append(random.uniform(-2, 2))
+        self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, [params for x in range(self.info["num_cuts"])])
+        # [0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,-1,1,0,0]
+
 
     def _run_prior_samples(self, num_shots_prior: int):
         if self.verbose:
@@ -62,7 +72,7 @@ class ShotQC():
         if self.verbose:
             print("--> Optimizing Parameters")
         
-        self.coef = optimize_params(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states)
+        self.params = optimize_params(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states)
 
     def _generate_subcircuit_entries(self):
         self.subcircuits_entries = []

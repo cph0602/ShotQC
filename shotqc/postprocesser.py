@@ -17,7 +17,7 @@ def generate_matrix_from_params(params, prep_states):
                 [-param[1], -param[1], 2-param[5], -2-param[5], param[1]+param[5], param[1]+param[5]],
                 [0 for _ in range(6)],
                 [-1-param[2], 1-param[2], -1-param[6], 1-param[6], 2+param[2]+param[6], param[2]+param[6]],
-                [-1-param[3], 1-param[3], -1-param[7], 1-param[7], param[3]+param[7], param[3]+param[7]]
+                [-1-param[3], 1-param[3], -1-param[7], 1-param[7], param[3]+param[7], 2+param[3]+param[7]]
             ]
         elif prep_states == range(6):
             assert len(param) == 24
@@ -61,7 +61,7 @@ def postprocess(data_folder: str, info, subcircuits_info, prep_states, params):
         bitstring = ''.join(bittuple)
         output_prob[bitstring] = 0
     coef_matrix = generate_matrix_from_params(params, prep_states)
-
+    # print(coef_matrix)
     for prep_config in itertools.product(prep_states, repeat = info["num_cuts"]):
         # set prep configurations
         prep = [[None for _ in range(subcircuit.num_qubits)] for subcircuit in subcircuits]
@@ -123,4 +123,4 @@ def postprocess(data_folder: str, info, subcircuits_info, prep_states, params):
                 total_product *= subcircuits_values[subcircuit_idx]
             output_prob[bitstring] += total_product
     
-    print(output_prob)
+    return output_prob

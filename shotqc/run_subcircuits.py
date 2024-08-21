@@ -4,6 +4,7 @@ from qiskit import QuantumCircuit
 import qiskit_aer as aer
 import copy, psutil, os, itertools
 import numpy as np
+from qiskit.quantum_info import Statevector
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
