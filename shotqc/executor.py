@@ -15,7 +15,7 @@ def get_num_workers(num_jobs, ram_required_per_worker):
     return num_workers
 
 
-def run_samples(subcircuits: List[QuantumCircuit], subcircuits_entries: List[List[tuple[List[int]]]], run_mode: str, SD_mode: str, SD_value: List[List[int]] | int, data_folder: str):
+def run_samples(subcircuits: List[QuantumCircuit], subcircuits_entries: List[List[tuple[List[int]]]], run_mode: str, SD_mode: str, SD_value: List[List[int]] | int | None, data_folder: str):
     """
     SD_mode = "equal": run each subcircuit variant with SD_value (int) shots each
     SD_mode = "distribute": run each subcircuit variant with its corresponding shot distribution SD_mode[subcircuit_index][subcircuit_entry_index]
@@ -25,6 +25,8 @@ def run_samples(subcircuits: List[QuantumCircuit], subcircuits_entries: List[Lis
         SD_dist = [[SD_value for _ in range(len(subcircuits_entries[subcircuit_idx]))] for subcircuit_idx in range(len(subcircuits))]
     elif SD_mode == "distribute":
         SD_dist = copy.deepcopy(SD_value)
+    elif SD_mode == "sv":
+        SD_dist = [[1 for _ in range(len(subcircuits_entries[subcircuit_idx]))] for subcircuit_idx in range(len(subcircuits))]
     else:
         raise Exception("Invalid SD_mode")
     stripped_subcircuits = [circuit_stripping(subcircuits[i]) for i in range(len(subcircuits))]

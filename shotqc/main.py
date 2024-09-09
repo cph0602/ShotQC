@@ -1,11 +1,12 @@
 from qiskit import QuantumCircuit
-import os, subprocess, random
+import os, subprocess, random, pickle, itertools
 from typing import List
-import itertools
+from math import floor
 from shotqc.executor import run_samples
-from shotqc.helper import initialize_counts
+from shotqc.helper import initialize_counts, read_probs_with_prior, params_matrix_to_list
 from shotqc.optimizer import optimize_params
 from shotqc.postprocesser import postprocess
+from shotqc.overhead import generate_distribution, calculate_variance
 
 class ShotQC():
     """
@@ -20,12 +21,14 @@ class ShotQC():
         self.verbose = verbose
         self.use_cut_params = True
         self.tmp_data_folder = "shotqc/tmp_data"
-        if os.path.exists(self.tmp_data_folder):
-            subprocess.run(["rm", "-r", self.tmp_data_folder])
-        os.makedirs(self.tmp_data_folder)
+        # if os.path.exists(self.tmp_data_folder):
+        #     subprocess.run(["rm", "-r", self.tmp_data_folder])
+        # os.makedirs(self.tmp_data_folder)
 
 
-    def execute(self, num_shots_prior: int | None = None, num_shots_total: int | None = None, num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", use_params: bool = True):
+    def execute(self, num_shots_prior: int | None = 1024, num_shots_total: int | None = None, 
+                num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", 
+                use_params: bool = True, method: str = "L-BFGS-B", prior: int = 1, distribe_shots: bool = True):
         """
         Run circuits with optimal shot distribution and optimal cut parameters.
         run_mode = "qasm": classical simulator
@@ -33,26 +36,67 @@ class ShotQC():
         num_shots_total: total number of shots
         num_iter: total iteration rounds
         """
+        # Preparation Stage
         self.prep_states = prep_states
+        self.prior = prior
+        self.total_shots_run = 0
+        self.num_shots_given = num_shots_total
+
+        # Generate entries
         print(f"--> Generating subcircuit entries:")
         self._generate_subcircuit_entries()
         for i in range(self.info["num_subcircuits"]):
             print(f"Subcircuit {i} has {self.info["num_subcircuits_entries"][i]} entries.")
         assert num_shots_prior*self.info["num_total_entries"] <= num_shots_total, f"Total number of prior shots({num_shots_prior*self.info["num_total_entries"]}) cannot exceed total shots({num_shots_total})."
-        initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
-        self._run_prior_samples(num_shots_prior)
-        # if use_params:
-        #     self._optimize_parameters()
         
+        # Begin execution
+        self._initialize_shot_count()
+        initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
+        # Runmode: baseline
+        if not distribe_shots:
+            self._run_prior_samples(floor(num_shots_total / self.info["num_total_entries"]))
+            self._generate_zero_params()
+            return
+        # Runmode: statevector
+        if run_mode == "sv":
+            self._generate_zero_params()
+            self._run_sv()
+        # Runmode: normal
+        else:
+            # Runtime: running prior samples
+            self._run_prior_samples(num_shots_prior)
+            # Runtime: optimizae parameters
+            if use_params:
+                self._optimize_params(method=method, prior=prior)
+            else:
+                self._generate_zero_params()
+            # Runtime: running posterior samples
+            num_shots_per_iter = floor((num_shots_total - num_shots_prior*self.info["num_total_entries"]) / num_iter)
+            for round in range(num_iter):
+                if self.verbose:
+                    print(f"--> Iteration {round +1}: Running Posterior Samples")
+                self._run_posterior_samples(num_shots_per_iter)
+
+
+    def variance(self):
+        current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, 0)
+        meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
+        entry_dict = meta_info["entry_dict"]
+        return calculate_variance(self.shot_count, self.params, current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
+
+    def _optimize_params(self, method, prior):
+        if self.verbose:
+            print("--> Optimizing Parameters")
+        opt_cost, self.params = optimize_params(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, prior, method)
+        if self.verbose:
+            print("Optimized cost: ", opt_cost)
+            print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))
     
+
     def reconstruct(self):
         if self.verbose:
             print("--> Building output probability")
-        params = []
-        for i in range(8):
-            params.append(random.uniform(-2, 2))
-        self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, [params for x in range(self.info["num_cuts"])])
-        # [0,0,0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0,0,0,-1,1,0,0]
+        self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, self.params)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
@@ -66,13 +110,53 @@ class ShotQC():
             num_shots_prior,
             self.tmp_data_folder
         )
+        for subcircuit_idx in range(self.info["num_subcircuits"]):
+            for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
+                self.shot_count[subcircuit_idx][entry_idx] += num_shots_prior
 
 
-    def _optimize_parameters(self):
+    def _run_sv(self):
         if self.verbose:
-            print("--> Optimizing Parameters")
-        
-        self.params = optimize_params(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states)
+            print("--> Running Statevector Simulation")
+        run_samples(
+            self.subcircuits,
+            self.subcircuits_entries,
+            "sv",
+            "sv",
+            None,
+            self.tmp_data_folder
+        )
+
+
+    def _run_posterior_samples(self, total_samples):
+        current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, self.prior)
+        meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
+        entry_dict = meta_info["entry_dict"]
+        distribution = generate_distribution(total_samples, params_matrix_to_list(self.params), current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
+        # print(distribution)
+        run_samples(
+            self.subcircuits,
+            self.subcircuits_entries,
+            "qasm",
+            "distribute",
+            distribution,
+            self.tmp_data_folder
+        )
+        for subcircuit_idx in range(self.info["num_subcircuits"]):
+            for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
+                self.shot_count[subcircuit_idx][entry_idx] += distribution[subcircuit_idx][entry_idx]
+
+
+    def _generate_zero_params(self):
+        if self.prep_states == [0,2,4,5]:
+            num_param = 8
+        elif self.prep_states == range(6):
+            num_param = 24
+        else:
+            raise Exception("Invalid prep states")
+        params = [[0 for _ in range(num_param)] for cut_idx in range(self.info["num_cuts"])]
+        self.params = params
+
 
     def _generate_subcircuit_entries(self):
         self.subcircuits_entries = []
@@ -98,6 +182,7 @@ class ShotQC():
         self.info["num_subcircuits_entries"] = num_subcircuits_entries
         self.info["num_total_entries"] = num_total_entries
         # print(self.subcircuits_entries)
+
 
     def extract_info(self):
         self.info["cuts"] = {}
@@ -175,7 +260,13 @@ class ShotQC():
         self.info["cut_index"] = {}
         for index, key in enumerate(list(self.info["cuts"].keys())):
             self.info["cut_index"][key] = index
+    
 
+    def _initialize_shot_count(self):
+        self.shot_count = []
+        for subcircuit_idx in range(self.info["num_subcircuits"]):
+            entry_count = [0 for _ in range(len(self.subcircuits_entries[subcircuit_idx]))]
+            self.shot_count.append(entry_count)
 
 
     def print_info(self):

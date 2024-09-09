@@ -2,7 +2,18 @@ from instructions.param_cut import ParamCut, Prep_Basis, Meas_Basis
 from qiskit import QuantumCircuit
 from qiskit.circuit import Instruction
 from shotqc.main import ShotQC
-from shotqc.helper import circuit_stripping
+from helper_functions.compare import ground_truth, squared_error
+from math import pi
+
+original_circuit = QuantumCircuit(4)
+original_circuit.h(0)
+original_circuit.cx(1,2)
+original_circuit.cx(0,1)
+original_circuit.cx(1,2)
+original_circuit.h(1)
+original_circuit.x(1)
+original_circuit.cx(2,3)
+ground_truth = ground_truth(original_circuit)
 
 subcircuit_1 = QuantumCircuit(3)
 subcircuit_1.h(0)
@@ -44,8 +55,26 @@ print("=============================================")
 
 
 subcircuits = [subcircuit_1, subcircuit_2, subcircuit_3]
+
+# sub1 = QuantumCircuit(2)
+# sub2 = QuantumCircuit(2)
+# # Input Subcircuit 1 #
+# sub1.h(0)
+# sub1.cx(0,1)
+# sub1.rx(pi/4, 0)
+# sub1.append(ParamCut("cut"), [1])
+# # Input Subcircuit 2 #
+# sub2.append(ParamCut("cut"), [0])
+# sub2.x(0)
+# sub2.rx(-pi/4, 1)
+# sub2.cx(0,1)
+
+# subcircuits = [sub1, sub2]
+
 shotqc = ShotQC(subcircuits=subcircuits, name="mycircuit", verbose=True)
 # shotqc.print_info()
-shotqc.execute(num_shots_prior=10000, num_shots_total=1000000000, prep_states = [0,2,4,5])
+shotqc.execute(num_shots_prior=100, num_shots_total=1000000, prep_states=[0,2,4,5], use_params=True, num_iter=5)
 shotqc.reconstruct()
 print(shotqc.output_prob)
+print("Variance: ", shotqc.variance())
+print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))

@@ -30,25 +30,43 @@ if __name__ == "__main__":
         circuit = modify_subcircuit(subcircuit, subcircuit_entry[0], subcircuit_entry[1])
         num_shots = SD_dist[job]
         if run_mode == "qasm":
+            if num_shots == 0:
+                continue
             simulator = aer.Aer.get_backend('aer_simulator', max_memory_mb=max_memory_mb)
             circuit.measure_all()
             sim_job = simulator.run(circuit, shots = num_shots)
             sim_result = sim_job.result()
             sim_counts = sim_result.get_counts(circuit)
+            previous_counts = pickle.load(open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "rb"))
+            previous_counts["total_shots"] += num_shots
+            for bitstring in sim_counts:
+                previous_counts["counts"][bitstring] += sim_counts[bitstring]
+            pickle.dump(
+                {
+                    "total_shots": previous_counts["total_shots"],
+                    "counts": previous_counts["counts"],
+                },
+                open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
+            )
+        elif run_mode == "sv":
+            simulator = aer.Aer.get_backend('statevector_simulator')
+            result = simulator.run(circuit).result()
+            statevector = result.get_statevector(circuit)
+            prob_vector = Statevector(statevector).probabilities()
+            output_dict = {}
+            for i in range(len(prob_vector)):
+                bits = "0"*(circuit.num_qubits - (len(bin(i))-2)) + str(bin(i)[2:])
+                output_dict[bits] = prob_vector[i]
+            pickle.dump(
+                {
+                    "total_shots": 1,
+                    "counts": output_dict,
+                },
+                open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
+            )
         else:
             raise Exception("Run mode not supported")
 
-        previous_counts = pickle.load(open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "rb"))
-        previous_counts["total_shots"] += num_shots
-        for bitstring in sim_counts:
-            previous_counts["counts"][bitstring] += sim_counts[bitstring]
-        pickle.dump(
-            {
-                "total_shots": previous_counts["total_shots"],
-                "counts": previous_counts["counts"],
-            },
-            open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
-        )
     subprocess.run(["rm", "%s/rank_%d.pckl" % (args.data_folder, args.rank)])
 
         
