@@ -79,6 +79,5 @@ def postprocess(data_folder: str, info, subcircuits_info, prep_states, params):
             total_product = 1
             for subcircuit_idx in range(len(subcircuits)):
                 total_product *= subcircuits_values[subcircuit_idx]
-            output_prob[bitstring] += total_product
-    
+            output_prob[bitstring] += total_product.item()
     return output_prob

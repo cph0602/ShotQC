@@ -1,12 +1,13 @@
 from qiskit import QuantumCircuit
-import os, subprocess, random, pickle, itertools
+import os, subprocess, random, pickle, itertools, torch
 from typing import List
 from math import floor
 from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, read_probs_with_prior, params_matrix_to_list
-from shotqc.optimizer import optimize_params
+from shotqc.optimizer import optimize_params, parallel_optimize_params
 from shotqc.postprocesser import postprocess
-from shotqc.overhead import generate_distribution, calculate_variance
+from shotqc.overhead import generate_distribution, calculate_variance, cost_function, entry_coef
+from shotqc.parallel_overhead_v2 import Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, parallel_variance, parallel_distribute
 
 class ShotQC():
     """
@@ -21,14 +22,15 @@ class ShotQC():
         self.verbose = verbose
         self.use_cut_params = True
         self.tmp_data_folder = "shotqc/tmp_data"
-        # if os.path.exists(self.tmp_data_folder):
-        #     subprocess.run(["rm", "-r", self.tmp_data_folder])
-        # os.makedirs(self.tmp_data_folder)
+        if os.path.exists(self.tmp_data_folder):
+            subprocess.run(["rm", "-r", self.tmp_data_folder])
+        os.makedirs(self.tmp_data_folder)
 
 
     def execute(self, num_shots_prior: int | None = 1024, num_shots_total: int | None = None, 
                 num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", 
-                use_params: bool = True, method: str = "L-BFGS-B", prior: int = 1, distribe_shots: bool = True):
+                use_params: bool = True, method: str = "SA", prior: int = 1, distribe_shots: bool = True, 
+                debug: bool = False):
         """
         Run circuits with optimal shot distribution and optimal cut parameters.
         run_mode = "qasm": classical simulator
@@ -41,6 +43,10 @@ class ShotQC():
         self.prior = prior
         self.total_shots_run = 0
         self.num_shots_given = num_shots_total
+        if prep_states == [0,2,4,5]:
+            self.num_params = 8
+        elif prep_states == range(6):
+            self.num_params = 24
 
         # Generate entries
         print(f"--> Generating subcircuit entries:")
@@ -52,15 +58,21 @@ class ShotQC():
         # Begin execution
         self._initialize_shot_count()
         initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
-        # Runmode: baseline
-        if not distribe_shots:
-            self._run_prior_samples(floor(num_shots_total / self.info["num_total_entries"]))
-            self._generate_zero_params()
+        # DEBUGGING
+        if debug:
+            args = Args(self)
+            params = torch.zeros(self.info["num_cuts"] * 8, requires_grad=True)
+            print(total_entry_coef(params, args, 1024))
             return
         # Runmode: statevector
         if run_mode == "sv":
             self._generate_zero_params()
             self._run_sv()
+        # Runmode: baseline
+        elif not distribe_shots:
+            self._run_prior_samples(floor(num_shots_total / self.info["num_total_entries"]))
+            self._generate_zero_params()
+            return
         # Runmode: normal
         else:
             # Runtime: running prior samples
@@ -72,22 +84,30 @@ class ShotQC():
                 self._generate_zero_params()
             # Runtime: running posterior samples
             num_shots_per_iter = floor((num_shots_total - num_shots_prior*self.info["num_total_entries"]) / num_iter)
-            for round in range(num_iter):
-                if self.verbose:
-                    print(f"--> Iteration {round +1}: Running Posterior Samples")
-                self._run_posterior_samples(num_shots_per_iter)
+            if num_shots_per_iter != 0:
+                for round in range(num_iter):
+                    if self.verbose:
+                        print(f"--> Iteration {round +1}: Running Posterior Samples")
+                    self._run_posterior_samples(num_shots_per_iter)
 
 
     def variance(self):
-        current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, 0)
-        meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
-        entry_dict = meta_info["entry_dict"]
-        return calculate_variance(self.shot_count, self.params, current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
+        # current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, 0)
+        # meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
+        # entry_dict = meta_info["entry_dict"]
+        # print("Theoretical Min. Variance: ", cost_function(params_matrix_to_list(self.params), current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states) ** 2 / self.num_shots_given)
+        # return calculate_variance(self.shot_count, self.params, current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
+        args = Args(self)
+        print("Theoretical Min. Variance: ", parallel_cost_function(self.params, args).item()**2/self.num_shots_given)
+        return parallel_variance(self.params, args, self.shot_count)
 
-    def _optimize_params(self, method, prior):
+    def _optimize_params(self, method, prior, init_params=None):
         if self.verbose:
             print("--> Optimizing Parameters")
-        opt_cost, self.params = optimize_params(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, prior, method)
+        if init_params == None:
+            init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
+        args = Args(self, prior=1)
+        opt_cost, self.params = parallel_optimize_params(init_params, args)
         if self.verbose:
             print("Optimized cost: ", opt_cost)
             print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))
@@ -96,7 +116,9 @@ class ShotQC():
     def reconstruct(self):
         if self.verbose:
             print("--> Building output probability")
-        self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, self.params)
+        # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
+        args = Args(self)
+        self.output_prob = parallel_reconstruct(self.params, args)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
@@ -129,11 +151,8 @@ class ShotQC():
 
 
     def _run_posterior_samples(self, total_samples):
-        current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, self.prior)
-        meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
-        entry_dict = meta_info["entry_dict"]
-        distribution = generate_distribution(total_samples, params_matrix_to_list(self.params), current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
-        # print(distribution)
+        args = Args(self)
+        distribution = parallel_distribute(self.params, args, total_samples)
         run_samples(
             self.subcircuits,
             self.subcircuits_entries,
@@ -148,14 +167,7 @@ class ShotQC():
 
 
     def _generate_zero_params(self):
-        if self.prep_states == [0,2,4,5]:
-            num_param = 8
-        elif self.prep_states == range(6):
-            num_param = 24
-        else:
-            raise Exception("Invalid prep states")
-        params = [[0 for _ in range(num_param)] for cut_idx in range(self.info["num_cuts"])]
-        self.params = params
+        self.params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
 
 
     def _generate_subcircuit_entries(self):
@@ -201,7 +213,7 @@ class ShotQC():
             subcircuit_cuts = set()
             for instr, qregs, cregs in subcircuit.data:
                 assert instr.name != "measure", "No measurements are allowed in subcircuits"
-                if instr.name == "param_cut":
+                if instr.name == "qpd_1q":
                     cut_label = instr.label
                     assert cut_label not in subcircuit_cuts, "Same cut cannot appear in one subcircuit"
                     subcircuit_cuts.add(cut_label)
@@ -211,27 +223,23 @@ class ShotQC():
                             assert self.info["cuts"][cut_label][1] == None, f"Repeat preparation for cut {cut_label}"
                             qubit_evolved[qregs[0]._index] = 1
                             subcircuit_input[qregs[0]._index] = cut_label
-                            instr.params[0] = 'p'
                             subcircuit_counter["rho"] += 1
                             self.info["cuts"][cut_label][1] = (index, qregs[0]._index)
                         elif qubit_evolved[qregs[0]._index] == 1:
                             assert self.info["cuts"][cut_label][0] == None, f"Repeat measurement for cut {cut_label}"
                             qubit_evolved[qregs[0]._index] = -1
                             subcircuit_output[qregs[0]._index] = cut_label
-                            instr.params[0] = 'm'
                             subcircuit_counter["O"] += 1
                             self.info["cuts"][cut_label][0] = (index, qregs[0]._index)
                     else:
                         if qubit_evolved[qregs[0]._index] == 0:
                             qubit_evolved[qregs[0]._index] = 1
                             subcircuit_input[qregs[0]._index] = cut_label
-                            instr.params[0] = 'p'
                             subcircuit_counter["rho"] += 1
                             self.info["cuts"][cut_label] = [None, (index, qregs[0]._index)]
                         elif qubit_evolved[qregs[0]._index] == 1:
                             qubit_evolved[qregs[0]._index] = -1
                             subcircuit_output[qregs[0]._index] = cut_label
-                            instr.params[0] = 'm'
                             subcircuit_counter["O"] += 1
                             self.info["cuts"][cut_label] = [(index, qregs[0]._index), None]
                 else:
