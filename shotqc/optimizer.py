@@ -5,7 +5,7 @@ from time import perf_counter
 from math import ceil
 from shotqc.helper import params_list_to_matrix, read_probs_with_prior
 from shotqc.overhead import cost_function
-from shotqc.parallel_overhead_v2 import parallel_cost_function
+from shotqc.parallel_overhead_v2 import parallel_cost_function, parallel_variance
 import torch.optim as optim
 
 
@@ -75,6 +75,18 @@ def parallel_optimize_params(init_params, args, lr=0.01, momentum=0.9, num_itera
     for i in range(num_iterations):
         optimizer.zero_grad()  # Clear previous gradients
         loss = parallel_cost_function(params, args)  # Compute the cost function
+        loss.backward()  # Compute gradients
+        optimizer.step()  # Update x using the optimizer
+        if (i+1)%10 == 0:
+            print(f"Step {i+1}/{num_iterations}: Cost = {loss.item()}")
+    return loss.item(), params
+
+def parallel_minimize_var(init_params, args, shot_count, lr=0.01, momentum=0.9, num_iterations=100):
+    params = init_params.clone().detach().requires_grad_(True)
+    optimizer = optim.SGD([params], lr=lr, momentum=momentum)
+    for i in range(num_iterations):
+        optimizer.zero_grad()  # Clear previous gradients
+        loss = parallel_variance(params, args, shot_count)  # Compute the cost function
         loss.backward()  # Compute gradients
         optimizer.step()  # Update x using the optimizer
         if (i+1)%10 == 0:

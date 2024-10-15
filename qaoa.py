@@ -35,12 +35,12 @@ shotqc.print_info()
 shotqc.execute(
     num_shots_prior=100, 
     num_shots_total=24000, 
-    prep_states=[0,2,4,5], 
+    prep_states=range(6), 
     use_params=True, 
     num_iter=1,
     run_mode="qasm"
 )
-shotqc.reconstruct()
+shotqc.reconstruct(final_optimize=True)
 # print(shotqc.output_prob)
 print("Variance: ", shotqc.variance())
 print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))

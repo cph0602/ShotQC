@@ -160,8 +160,10 @@ def generate_matrix(params, prep_states):
     M = M / 2  # Element-wise division by 2, preserving gradient
     return M
 
-def tensor_product(tensors):
+def tensor_product(tensors, device):
     n = len(tensors)
+    if n == 0:
+        return torch.tensor(1., device=device)
     tensor_size = tensors[0].shape[0]
     indices = torch.ones((n,n), dtype=torch.int)
     for i in range(n):

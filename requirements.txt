@@ -1,0 +1,5 @@
+torch
+qiskit
+psutil
+qiskit_aer
+qiskit_addon_cutting

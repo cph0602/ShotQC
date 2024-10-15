@@ -1,8 +1,4 @@
-from qiskit import QuantumCircuit, transpile, assemble
-from qiskit.visualization import plot_histogram
-import matplotlib.pyplot as plt
-import numpy as np
-import qiskit_aer as aer
+from qiskit import QuantumCircuit
 
 # Create the QAOA circuit
 def qaoa_circuit(gamma, beta, graph):

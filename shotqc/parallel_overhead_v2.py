@@ -55,7 +55,7 @@ class Args:
         
     def read_probs(self, prior):
         if self.verbose:
-            print("--> Reading data")
+            print("-----> Reading data")
         entry_probs = []
         for subcircuit_idx in range(self.num_subcircuits):
             subcircuit_shape = (2,)*self.subcircuits_info[subcircuit_idx]['num_qubits']
@@ -148,7 +148,7 @@ def calc_subcircuit_value(coef_matrix, args, batch, prep_config, subcircuit_idx,
     for meas_cut in args.meas_cuts[subcircuit_idx]:
         coef_matrix_rows.append(coef_matrix[meas_cut][args.prep_states[prep_config[meas_cut]]][:])
     #  2. perform tensor product
-    coef_tensor_product = tensor_product(coef_matrix_rows)
+    # moved back
     #  3. find correct section of entry_probs that correspond to this prep_config
     subcircuit_bitstrings = torch.flip(batch, dims=[1])[:, args.acc_eff_qubits[subcircuit_idx]:args.acc_eff_qubits[subcircuit_idx+1]]
     # print(subcircuit_bitstrings.shape)
@@ -160,6 +160,9 @@ def calc_subcircuit_value(coef_matrix, args, batch, prep_config, subcircuit_idx,
     # print(permuted_probs.shape)
     final_permute_order = (1,0) + tuple([i+2 for i in range(num_meas)])
     used_probs = permuted_probs[(slice(None),) + indices].permute(final_permute_order).contiguous()
+    # if num_meas == 0:
+    #     return used_probs.squeeze(), torch.ones((batch_size,1), device=device)
+    # print(used_probs.shape)
     # used_probs = permuted_probs[:,subcircuit_bitstrings[:, 0],subcircuit_bitstrings[:, 1],subcircuit_bitstrings[:, 2],subcircuit_bitstrings[:, 3]]
     # print(used_probs.shape)
     #### CHECKING PASSED ####
@@ -168,12 +171,14 @@ def calc_subcircuit_value(coef_matrix, args, batch, prep_config, subcircuit_idx,
     #  4. perform element-wise multiplication
     #    (a) lining them up
     coef_permute_tuple = tuple([i*2 for i in range(num_meas)]) + tuple([i*2+1 for i in range(num_meas)])
+    coef_tensor_product = tensor_product(coef_matrix_rows, device)
     lined_coef_products = coef_tensor_product.view((3,2)*num_meas).permute(coef_permute_tuple).contiguous().view((3**num_meas,)+(2,)*num_meas)
     # print(lined_coef_products.shape)
     # print(used_probs.shape)
     #    (b) multiply
     #  4.5. use sum() for subcircuit value
-    sum_dimensions = tuple([i+1 for i in range(num_meas*2)])
+    sum_dimensions = tuple([i+1 for i in range(num_meas+1)])
+    # print(sum_dimensions)
     subcircuit_value = torch.sum(used_probs * lined_coef_products, dim=(sum_dimensions))
     # if subcircuit_idx == 0:
     #     print(subcircuit_value[20]) ### PASSED
@@ -306,7 +311,7 @@ def parallel_variance(params, args, shot_count, device=None, batch_size=1024):
     for subcircuit_idx in range(args.num_subcircuits):
         temp = torch.tensor(shot_count[subcircuit_idx], device=device)
         var = var + torch.sum(entry_coef[subcircuit_idx] / temp)
-    return var.item()
+    return var
 
 def parallel_reconstruct(params, args, device=None, batch_size=1024):
     # Handle in batches to avoid memory overload

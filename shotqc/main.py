@@ -4,7 +4,7 @@ from typing import List
 from math import floor
 from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, read_probs_with_prior, params_matrix_to_list
-from shotqc.optimizer import optimize_params, parallel_optimize_params
+from shotqc.optimizer import optimize_params, parallel_optimize_params, parallel_minimize_var
 from shotqc.postprocesser import postprocess
 from shotqc.overhead import generate_distribution, calculate_variance, cost_function, entry_coef
 from shotqc.parallel_overhead_v2 import Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, parallel_variance, parallel_distribute
@@ -29,7 +29,7 @@ class ShotQC():
 
     def execute(self, num_shots_prior: int | None = 1024, num_shots_total: int | None = None, 
                 num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", 
-                use_params: bool = True, method: str = "SA", prior: int = 1, distribe_shots: bool = True, 
+                use_params: bool = True, method: str = "SGD", prior: int = 1, distribe_shots: bool = True, 
                 debug: bool = False):
         """
         Run circuits with optimal shot distribution and optimal cut parameters.
@@ -99,25 +99,27 @@ class ShotQC():
         # return calculate_variance(self.shot_count, self.params, current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
         args = Args(self)
         print("Theoretical Min. Variance: ", parallel_cost_function(self.params, args).item()**2/self.num_shots_given)
-        return parallel_variance(self.params, args, self.shot_count)
+        return parallel_variance(self.params, args, self.shot_count).item()
 
-    def _optimize_params(self, method, prior, init_params=None):
+    def _optimize_params(self, method, prior=1, init_params=None):
         if self.verbose:
             print("--> Optimizing Parameters")
         if init_params == None:
             init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
-        args = Args(self, prior=1)
+        args = Args(self, prior=prior)
         opt_cost, self.params = parallel_optimize_params(init_params, args)
         if self.verbose:
             print("Optimized cost: ", opt_cost)
             print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))
     
 
-    def reconstruct(self):
+    def reconstruct(self, final_optimize=False):
         if self.verbose:
             print("--> Building output probability")
         # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
         args = Args(self)
+        if final_optimize:
+            final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count)
         self.output_prob = parallel_reconstruct(self.params, args)
 
 

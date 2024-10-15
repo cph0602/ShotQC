@@ -8,10 +8,16 @@ from math import pi
 import numpy as np
 import networkx as nx
 from itertools import product, combinations
-from testbench.supremacy import supremacy_49, supremacy_35
+from testbench.supremacy import supremacy_25
+from qiskit_addon_cutting.
 
-qc = supremacy_35()
-subcircuits = cut_circuit(qc)
-for idx, subcircuit in enumerate(subcircuits):
-    print(f"Subcircuit {idx}: {subcircuit.num_qubits} qubits")
-    print(subcircuit)
+qc = supremacy_25()
+subcircuit_1 = {
+    "prep": [5,10,12,14],
+    "meas": [11]
+}
+subcircuit_2 = {
+    "prep": [3],
+    "meas": [0,2,4,9]
+}
+mapping = [0,1,2,3,4,5,6,7,8,9,14,10,15,11,12,16,17,18,19,13,20,21,22,23]
