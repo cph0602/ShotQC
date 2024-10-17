@@ -2,7 +2,7 @@ import random
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.dagcircuit.dagcircuit import DAGCircuit
 from qiskit import QuantumCircuit
-import itertools, pickle, os, subprocess, time, torch
+import itertools, os, subprocess, time, torch
 
 def scrambled(orig):
     dest = orig[:]
@@ -36,18 +36,9 @@ def initialize_counts(data_folder, subcircuits, subcircuits_entries):
         subprocess.run(["rm", "-r", data_folder])
     os.makedirs(data_folder)
     for subcircuit_idx, subcircuit in enumerate(subcircuits):
-        for job in range(len(subcircuits_entries[subcircuit_idx])):
-            if not os.path.exists("%s/subcircuit_%d_entry_%d" % (data_folder, subcircuit_idx, job)):
-                counts = {}
-                for bitstring in itertools.product('01', repeat = subcircuit.num_qubits):
-                    counts[''.join(bitstring)] = 0
-                pickle.dump(
-                    {
-                        "total_shots": 0,
-                        "counts": counts,
-                    },
-                    open("%s/subcircuit_%d_entry_%d.pckl" % (data_folder, subcircuit_idx, job), "wb"),
-                )
+        for entry_idx in range(len(subcircuits_entries[subcircuit_idx])):
+            count = torch.zeros((2,)*subcircuit.num_qubits)
+            torch.save(count, f'{data_folder}/subcircuit_{subcircuit_idx}_entry_{entry_idx}.pt')
 
 def generate_prob_from_counts_with_prior(counts, prior=0):
     total_num = counts["total_shots"]
@@ -67,19 +58,19 @@ def params_list_to_matrix(params_list, prep_states):
     else:
         raise Exception("current state set not supported")
 
-def read_probs_with_prior(data_folder, prior):
-    meta_info = pickle.load(open("%s/meta_info.pckl" % (data_folder), "rb"))
-    entry_dict = meta_info["entry_dict"]
-    subcircuits = meta_info["subcircuits"]
-    prob_with_prior = []
-    for subcircuit_idx in range(len(subcircuits)):
-        subcircuit_entries = []
-        for entry_idx in range(len(list(entry_dict[subcircuit_idx].keys()))):
-            counts = pickle.load(open("%s/subcircuit_%d_entry_%d.pckl" % (data_folder, subcircuit_idx, entry_idx), "rb"))
-            probs = generate_prob_from_counts_with_prior(counts, prior)
-            subcircuit_entries.append(probs)
-        prob_with_prior.append(subcircuit_entries)
-    return prob_with_prior
+# def read_probs_with_prior(data_folder, prior):
+#     meta_info = pickle.load(open("%s/meta_info.pckl" % (data_folder), "rb"))
+#     entry_dict = meta_info["entry_dict"]
+#     subcircuits = meta_info["subcircuits"]
+#     prob_with_prior = []
+#     for subcircuit_idx in range(len(subcircuits)):
+#         subcircuit_entries = []
+#         for entry_idx in range(len(list(entry_dict[subcircuit_idx].keys()))):
+#             counts = pickle.load(open("%s/subcircuit_%d_entry_%d.pckl" % (data_folder, subcircuit_idx, entry_idx), "rb"))
+#             probs = generate_prob_from_counts_with_prior(counts, prior)
+#             subcircuit_entries.append(probs)
+#         prob_with_prior.append(subcircuit_entries)
+#     return prob_with_prior
 
 def params_matrix_to_list(params):
     return torch.flatten(params)

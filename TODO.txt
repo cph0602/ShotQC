@@ -1,6 +1,2 @@
-main.py
-    __init__ 
-        - uncomment the part that removes tmp_folder
-    execute
-        - uncomment run_sv
-    
+Notes: 
+25 qubit, 550 secs/batch, batch_size=16 (max 512), no variance calc.

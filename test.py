@@ -1,87 +1,30 @@
-from qiskit import QuantumCircuit
-from qiskit.circuit import Instruction
-from shotqc.main import ShotQC
-from helper_functions.compare import ground_truth, squared_error
-from math import pi
-import numpy as np
-from helper_functions.helper_instr import PseudoQPD1Q
+import torch, random, itertools
+from time import perf_counter
+import torch
 
-original_circuit = QuantumCircuit(4)
-original_circuit.h(0)
-original_circuit.cx(1,2)
-original_circuit.cx(0,1)
-original_circuit.cx(1,2)
-original_circuit.h(1)
-original_circuit.x(1)
-original_circuit.cx(2,3)
-# optimization_settings = OptimizationParameters(seed=111, gate_lo=False, wire_lo=True)
-# device_constraints = DeviceConstraints(qubits_per_subcircuit=4)
-# cut_circuit, metadata = find_cuts(original_circuit, optimization_settings, device_constraints)
-# print(cut_circuit)
-ground_truth = ground_truth(original_circuit)
+def f(x,y):
+    # Define a simple forward pass with intermediate results
+    
 
+    # Some computation that generates an intermediate tensor
+    intermediate_result = x + y
 
+    # Save the intermediate result to disk
+    torch.save(intermediate_result, 'intermediate_result.pt')
 
-subcircuit_1 = QuantumCircuit(3)
-subcircuit_1.h(0)
-subcircuit_1.cx(1,2)
-subcircuit_1.cx(0,1)
-subcircuit_1.append(PseudoQPD1Q("cut_1"), [1])
-subcircuit_1.append(PseudoQPD1Q("cut_2"), [2])
-print(subcircuit_1)
+    # Load it back when needed
+    loaded_intermediate = torch.load('intermediate_result.pt').to('cuda')
 
-subcircuit_2 = QuantumCircuit(2)
-subcircuit_2.append(PseudoQPD1Q('cut_1'), [0])
-subcircuit_2.append(PseudoQPD1Q('cut_2'), [1])
-subcircuit_2.cx(0,1)
-subcircuit_2.h(0)
-subcircuit_2.x(0)
-subcircuit_2.append(PseudoQPD1Q('cut_3'), [1])
-print(subcircuit_2)
-
-subcircuit_3 = QuantumCircuit(2)
-subcircuit_3.append(PseudoQPD1Q('cut_3'), [0])
-subcircuit_3.cx(0,1)
-print(subcircuit_3)
-
-# subcircuit_1 = QuantumCircuit(2)
-# subcircuit_1.h(0)
-# subcircuit_1.cx(0,1)
-# subcircuit_1.append(ParamCut("cut_1"), [1])
-
-# subcircuit_2 = QuantumCircuit(2)
-# subcircuit_2.append(ParamCut("cut_1"), [0])
-# subcircuit_2.cx(0,1)
-# subcircuits = [subcircuit_1, subcircuit_2]
-# subcircuit_2.append(ParamCut("cut_2"), [1])
-
-# subcircuit_3 = QuantumCircuit(2)
-# subcircuit_3.append(ParamCut("cut_2"), [0])
-# subcircuit_3.cx(0,1)
-print("=============================================")
-
-
-subcircuits = [subcircuit_1, subcircuit_2, subcircuit_3]
-
-# sub1 = QuantumCircuit(2)
-# sub2 = QuantumCircuit(2)
-# # Input Subcircuit 1 #
-# sub1.h(0)
-# sub1.cx(0,1)
-# sub1.rx(pi/4, 0)
-# sub1.append(ParamCut("cut"), [1])
-# # Input Subcircuit 2 #
-# sub2.append(ParamCut("cut"), [0])
-# sub2.x(0)
-# sub2.rx(-pi/4, 1)
-# sub2.cx(0,1)
-
-# subcircuits = [sub1, sub2]
-
-shotqc = ShotQC(subcircuits=subcircuits, name="mycircuit", verbose=True)
-# shotqc.print_info()
-shotqc.execute(num_shots_prior=1000, num_shots_total=1000000, prep_states=[0,2,4,5], use_params=True, num_iter=5)
-shotqc.reconstruct()
-print(shotqc.output_prob)
-print("Variance: ", shotqc.variance())
-print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))
+    # Continue with further computation
+    output = torch.sum(loaded_intermediate * 2)
+    return output
+# print(output.requires_grad)
+x = torch.randn(10, 10, requires_grad=True).to('cuda').detach().requires_grad_(True)
+y = torch.randn(10, 10).to('cuda')
+optimizer = torch.optim.SGD([x])
+for i in range(100):
+    optimizer.zero_grad()
+    output = f(x,y)
+    output.backward()
+    optimizer.step()
+    print(output.item())

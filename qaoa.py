@@ -40,7 +40,7 @@ shotqc.execute(
     num_iter=1,
     run_mode="qasm"
 )
-shotqc.reconstruct(final_optimize=True)
+shotqc.reconstruct()
 # print(shotqc.output_prob)
 print("Variance: ", shotqc.variance())
 print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))

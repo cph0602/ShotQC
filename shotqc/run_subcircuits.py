@@ -2,7 +2,7 @@ import argparse, pickle, subprocess
 from shotqc.executor import modify_subcircuit
 from qiskit import QuantumCircuit
 import qiskit_aer as aer
-import copy, psutil, os, itertools
+import copy, psutil, os, itertools, torch
 import numpy as np
 from qiskit.quantum_info import Statevector
 
@@ -37,33 +37,18 @@ if __name__ == "__main__":
             sim_job = simulator.run(circuit, shots = num_shots)
             sim_result = sim_job.result()
             sim_counts = sim_result.get_counts(circuit)
-            previous_counts = pickle.load(open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "rb"))
-            previous_counts["total_shots"] += num_shots
+            previous_counts = torch.load(f'{args.data_folder}/subcircuit_{subcircuit_idx}_entry_{job}.pt', weights_only=True)
             for bitstring in sim_counts:
-                previous_counts["counts"][bitstring] += sim_counts[bitstring]
-            pickle.dump(
-                {
-                    "total_shots": previous_counts["total_shots"],
-                    "counts": previous_counts["counts"],
-                },
-                open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
-            )
+                index = tuple(map(int, bitstring))
+                previous_counts[index] = previous_counts[index] + sim_counts[bitstring]
+            torch.save(previous_counts, f'{args.data_folder}/subcircuit_{subcircuit_idx}_entry_{job}.pt')
         elif run_mode == "sv":
             simulator = aer.Aer.get_backend('statevector_simulator')
             result = simulator.run(circuit).result()
             statevector = result.get_statevector(circuit)
             prob_vector = Statevector(statevector).probabilities()
-            output_dict = {}
-            for i in range(len(prob_vector)):
-                bits = "0"*(circuit.num_qubits - (len(bin(i))-2)) + str(bin(i)[2:])
-                output_dict[bits] = prob_vector[i]
-            pickle.dump(
-                {
-                    "total_shots": 1,
-                    "counts": output_dict,
-                },
-                open("%s/subcircuit_%d_entry_%d.pckl" % (args.data_folder, subcircuit_idx, job), "wb"),
-            )
+            probs = torch.tensor(prob_vector).view((2,)*subcircuit.num_qubits)
+            torch.save(previous_counts, f'{args.data_folder}/subcircuit_{subcircuit_idx}_entry_{job}.pt')
         else:
             raise Exception("Run mode not supported")
 

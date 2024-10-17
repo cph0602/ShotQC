@@ -1,19 +1,23 @@
 from qiskit import QuantumCircuit
-import os, subprocess, random, pickle, itertools, torch
+import os, subprocess, random, pickle, itertools, torch, time
 from typing import List
 from math import floor
+from time import perf_counter
 from shotqc.executor import run_samples
-from shotqc.helper import initialize_counts, read_probs_with_prior, params_matrix_to_list
-from shotqc.optimizer import optimize_params, parallel_optimize_params, parallel_minimize_var
+from shotqc.helper import initialize_counts, params_matrix_to_list
+from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var
 from shotqc.postprocesser import postprocess
 from shotqc.overhead import generate_distribution, calculate_variance, cost_function, entry_coef
-from shotqc.parallel_overhead_v2 import Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, parallel_variance, parallel_distribute
+from shotqc.parallel_overhead_v2 import (
+    Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, 
+    parallel_variance, parallel_distribute
+)
 
 class ShotQC():
     """
     Main class for shotqc
     """
-    def __init__(self, subcircuits: List[QuantumCircuit] | None = None, name: str | None = None, verbose: bool = False, use_cut_params: bool = True):
+    def __init__(self, subcircuits: List[QuantumCircuit] | None = None, name: str | None = None, verbose: bool = False, reset_files: bool = True):
         assert subcircuits != None, "Subcircuits cannot be empty"
         self.name = name
         self.subcircuits = subcircuits
@@ -22,15 +26,17 @@ class ShotQC():
         self.verbose = verbose
         self.use_cut_params = True
         self.tmp_data_folder = "shotqc/tmp_data"
-        if os.path.exists(self.tmp_data_folder):
+        self.reset_files = reset_files
+        if os.path.exists(self.tmp_data_folder) and reset_files:
             subprocess.run(["rm", "-r", self.tmp_data_folder])
-        os.makedirs(self.tmp_data_folder)
+        if reset_files:
+            os.makedirs(self.tmp_data_folder)
 
 
     def execute(self, num_shots_prior: int | None = 1024, num_shots_total: int | None = None, 
                 num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", 
                 use_params: bool = True, method: str = "SGD", prior: int = 1, distribe_shots: bool = True, 
-                debug: bool = False):
+                debug: bool = False, batch_size: int = 1024):
         """
         Run circuits with optimal shot distribution and optimal cut parameters.
         run_mode = "qasm": classical simulator
@@ -57,12 +63,17 @@ class ShotQC():
         
         # Begin execution
         self._initialize_shot_count()
-        initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
+        if self.reset_files:
+            initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
         # DEBUGGING
         if debug:
+            print("--> Running Debug Snippet")
+            start_time = perf_counter()
             args = Args(self)
-            params = torch.zeros(self.info["num_cuts"] * 8, requires_grad=True)
-            print(total_entry_coef(params, args, 1024))
+            params = torch.zeros(self.num_params*self.info["num_cuts"])
+            with torch.no_grad():
+                total_entry_coef(params, args, batch_size)
+            print("Time Elapsed: ", perf_counter()-start_time)
             return
         # Runmode: statevector
         if run_mode == "sv":
@@ -79,7 +90,7 @@ class ShotQC():
             self._run_prior_samples(num_shots_prior)
             # Runtime: optimizae parameters
             if use_params:
-                self._optimize_params(method=method, prior=prior)
+                self._optimize_params(method=method, prior=prior, batch_size=batch_size)
             else:
                 self._generate_zero_params()
             # Runtime: running posterior samples
@@ -88,26 +99,22 @@ class ShotQC():
                 for round in range(num_iter):
                     if self.verbose:
                         print(f"--> Iteration {round +1}: Running Posterior Samples")
-                    self._run_posterior_samples(num_shots_per_iter)
+                    self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
 
 
     def variance(self):
-        # current_prob_with_prior = read_probs_with_prior(self.tmp_data_folder, 0)
-        # meta_info = pickle.load(open("%s/meta_info.pckl" % (self.tmp_data_folder), "rb"))
-        # entry_dict = meta_info["entry_dict"]
-        # print("Theoretical Min. Variance: ", cost_function(params_matrix_to_list(self.params), current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states) ** 2 / self.num_shots_given)
-        # return calculate_variance(self.shot_count, self.params, current_prob_with_prior, entry_dict, self.info, self.subcircuits_info, self.prep_states)
         args = Args(self)
         print("Theoretical Min. Variance: ", parallel_cost_function(self.params, args).item()**2/self.num_shots_given)
         return parallel_variance(self.params, args, self.shot_count).item()
 
-    def _optimize_params(self, method, prior=1, init_params=None):
+
+    def _optimize_params(self, method, prior=1, init_params=None, batch_size=1024):
         if self.verbose:
             print("--> Optimizing Parameters")
         if init_params == None:
             init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
         args = Args(self, prior=prior)
-        opt_cost, self.params = parallel_optimize_params(init_params, args)
+        opt_cost, self.params = parallel_optimize_params_sgd(init_params, args, batch_size=batch_size)
         if self.verbose:
             print("Optimized cost: ", opt_cost)
             print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))
@@ -120,7 +127,8 @@ class ShotQC():
         args = Args(self)
         if final_optimize:
             final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count)
-        self.output_prob = parallel_reconstruct(self.params, args)
+        with torch.no_grad():
+            self.output_prob = parallel_reconstruct(self.params, args)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
@@ -152,9 +160,13 @@ class ShotQC():
         )
 
 
-    def _run_posterior_samples(self, total_samples):
+    def _run_posterior_samples(self, total_samples, batch_size):
         args = Args(self)
-        distribution = parallel_distribute(self.params, args, total_samples)
+        if self.verbose:
+            print("-----> Distributing Shots")
+        distribution = parallel_distribute(self.params, args, total_samples, batch_size=batch_size)
+        if self.verbose:
+            print("-----> Running Samples")
         run_samples(
             self.subcircuits,
             self.subcircuits_entries,
