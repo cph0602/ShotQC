@@ -2,98 +2,39 @@ nohup: ignoring input
 --> Generating subcircuit entries:
 Subcircuit 0 has 768 entries.
 Subcircuit 1 has 324 entries.
---> Running Debug Snippet
+--> Running Prior Samples
+rm: cannot remove 'shotqc/tmp_data/rank_17.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_13.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_7.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_16.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_14.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_4.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_5.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_10.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_12.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_2.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_3.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_6.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_9.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_15.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_1.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_11.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_8.pckl': No such file or directory
+rm: cannot remove 'shotqc/tmp_data/rank_0.pckl': No such file or directory
+--> Iteration 1: Running Posterior Samples
 -----> Reading data
-done
-save:  0.14915315993130207
-One prep config took 0.16210375260561705 seconds. Estimate total 165.99424266815186 seconds.
-save:  0.16129888035356998
-One prep config took 0.16417095996439457 seconds. Estimate total 168.11106300354004 seconds.
-save:  0.15265315398573875
-One prep config took 0.15562331397086382 seconds. Estimate total 159.35827350616455 seconds.
-save:  0.14897193666547537
-One prep config took 0.15190187189728022 seconds. Estimate total 155.54751682281494 seconds.
-save:  0.46548462472856045
-One prep config took 0.46826722007244825 seconds. Estimate total 479.505633354187 seconds.
-save:  0.4154658280313015
-One prep config took 0.42300964798778296 seconds. Estimate total 433.16187953948975 seconds.
-save:  0.42849314771592617
-One prep config took 0.4345459211617708 seconds. Estimate total 444.9750232696533 seconds.
-save:  0.41866231989115477
-One prep config took 0.42615139577537775 seconds. Estimate total 436.3790292739868 seconds.
-save:  0.4461637930944562
-One prep config took 0.45333046838641167 seconds. Estimate total 464.21039962768555 seconds.
-save:  0.4363896166905761
-One prep config took 0.443259340710938 seconds. Estimate total 453.8975648880005 seconds.
-save:  0.43985800724476576
-One prep config took 0.4474161071702838 seconds. Estimate total 458.1540937423706 seconds.
-save:  0.43170895613729954
-One prep config took 0.43932867888361216 seconds. Estimate total 449.87256717681885 seconds.
-save:  0.45331219024956226
-One prep config took 0.46121626161038876 seconds. Estimate total 472.2854518890381 seconds.
-save:  0.4215135620906949
-One prep config took 0.42870235443115234 seconds. Estimate total 438.9912109375 seconds.
-save:  0.43198946584016085
-One prep config took 0.43897670134902 seconds. Estimate total 449.5121421813965 seconds.
-save:  0.43076635617762804
-One prep config took 0.43844325840473175 seconds. Estimate total 448.9658966064453 seconds.
-save:  0.4412945285439491
-One prep config took 0.4497059239074588 seconds. Estimate total 460.4988660812378 seconds.
-save:  0.4204382598400116
-One prep config took 0.4258462740108371 seconds. Estimate total 436.06658458709717 seconds.
-save:  0.43915578350424767
-One prep config took 0.4461406683549285 seconds. Estimate total 456.8480443954468 seconds.
-save:  0.4481152128428221
-One prep config took 0.45572061650455 seconds. Estimate total 466.6579113006592 seconds.
-save:  0.4541171249002218
-One prep config took 0.45761012472212315 seconds. Estimate total 468.5927677154541 seconds.
-save:  0.4299851097166538
-One prep config took 0.43749978858977556 seconds. Estimate total 447.9997835159302 seconds.
-save:  0.4417433422058821
-One prep config took 0.4496042700484395 seconds. Estimate total 460.39477252960205 seconds.
-save:  0.41975237987935543
-One prep config took 0.4272640822455287 seconds. Estimate total 437.5184202194214 seconds.
-save:  0.44661545008420944
-One prep config took 0.453265811316669 seconds. Estimate total 464.14419078826904 seconds.
-save:  0.4202676275745034
-One prep config took 0.42643343284726143 seconds. Estimate total 436.6678352355957 seconds.
-save:  0.4317587995901704
-One prep config took 0.43941483926028013 seconds. Estimate total 449.96079540252686 seconds.
-save:  0.42713040113449097
-One prep config took 0.43444051314145327 seconds. Estimate total 444.86708545684814 seconds.
-save:  0.4456740263849497
-One prep config took 0.45343437418341637 seconds. Estimate total 464.31679916381836 seconds.
-save:  0.4358608415350318
-One prep config took 0.4423921899870038 seconds. Estimate total 453.0096025466919 seconds.
-save:  0.4273739159107208
-One prep config took 0.43538646679371595 seconds. Estimate total 445.83574199676514 seconds.
-save:  0.41241657361388206
-One prep config took 0.42008912563323975 seconds. Estimate total 430.1712646484375 seconds.
-save:  0.47638685069978237
-One prep config took 0.48370442260056734 seconds. Estimate total 495.31332874298096 seconds.
-save:  0.4355416549369693
-One prep config took 0.4430752443149686 seconds. Estimate total 453.70905017852783 seconds.
-save:  0.4262439804151654
-One prep config took 0.4307774370536208 seconds. Estimate total 441.1160955429077 seconds.
-save:  0.43540991097688675
-One prep config took 0.44251198414713144 seconds. Estimate total 453.1322717666626 seconds.
-save:  0.45374586153775454
-One prep config took 0.4615599671378732 seconds. Estimate total 472.63740634918213 seconds.
-save:  0.41811981704086065
-One prep config took 0.4258192693814635 seconds. Estimate total 436.03893184661865 seconds.
-save:  0.414058038033545
-One prep config took 0.4212589943781495 seconds. Estimate total 431.3692102432251 seconds.
-save:  0.42453400418162346
-One prep config took 0.42736772540956736 seconds. Estimate total 437.624550819397 seconds.
-save:  0.44531757663935423
-One prep config took 0.45294876769185066 seconds. Estimate total 463.8195381164551 seconds.
-save:  0.4265620969235897
-One prep config took 0.43359299283474684 seconds. Estimate total 443.99922466278076 seconds.
-save:  0.42513270024210215
-One prep config took 0.43291844613850117 seconds. Estimate total 443.3084888458252 seconds.
-save:  0.41387227084487677
-One prep config took 0.4210520051419735 seconds. Estimate total 431.15725326538086 seconds.
-save:  0.4471250995993614
-One prep config took 0.4543995251879096 seconds. Estimate total 465.30511379241943 seconds.
-save:  0.4340025754645467
-One prep config took 0.4409837080165744 seconds. Estimate total 451.56731700897217 seconds.
+-----> Distributing Shots
+Traceback (most recent call last):
+  File "/home/b10901076/ShotQC/example.py", line 43, in <module>
+    shotqc.execute(
+  File "/home/b10901076/ShotQC/shotqc/main.py", line 103, in execute
+    self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
+  File "/home/b10901076/ShotQC/shotqc/main.py", line 169, in _run_posterior_samples
+    distribution = parallel_distribute(self.params, args, total_samples, batch_size=batch_size)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/b10901076/ShotQC/shotqc/parallel_overhead_v2.py", line 612, in parallel_distribute
+    entry_coef = total_entry_coef(params, args, batch_size)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/b10901076/ShotQC/shotqc/parallel_overhead_v2.py", line 528, in total_entry_coef
+    torch.zeros((this_batch_size,args.num_entries[subcircuit_idx])+(2,)*args.num_meas[subcircuit_idx],
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 10.12 GiB. GPU 0 has a total capacity of 22.05 GiB of which 5.83 GiB is free. Process 2461990 has 12.58 GiB memory in use. Including non-PyTorch memory, this process has 3.59 GiB memory in use. Of the allocated memory 3.14 GiB is allocated by PyTorch, and 21.49 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

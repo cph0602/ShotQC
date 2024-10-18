@@ -6,8 +6,6 @@ from time import perf_counter
 from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, params_matrix_to_list
 from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var
-from shotqc.postprocesser import postprocess
-from shotqc.overhead import generate_distribution, calculate_variance, cost_function, entry_coef
 from shotqc.parallel_overhead_v2 import (
     Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, 
     parallel_variance, parallel_distribute
@@ -69,10 +67,13 @@ class ShotQC():
         if debug:
             print("--> Running Debug Snippet")
             start_time = perf_counter()
-            args = Args(self)
-            params = torch.zeros(self.num_params*self.info["num_cuts"])
-            with torch.no_grad():
-                total_entry_coef(params, args, batch_size)
+            self._generate_zero_params()
+            # # initialize_counts(self.tmp_data_folder, self.subcircuits, self.subcircuits_entries)
+            # # self._run_prior_samples(floor(num_shots_total / self.info["num_total_entries"]))
+            # args = Args(self)
+            # params = torch.zeros(self.num_params*self.info["num_cuts"])
+            # with torch.no_grad():
+            #     total_entry_coef(params, args, batch_size)
             print("Time Elapsed: ", perf_counter()-start_time)
             return
         # Runmode: statevector
@@ -120,7 +121,7 @@ class ShotQC():
             print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))
     
 
-    def reconstruct(self, final_optimize=False):
+    def reconstruct(self, final_optimize=False, batch_size=1024):
         if self.verbose:
             print("--> Building output probability")
         # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
@@ -128,7 +129,8 @@ class ShotQC():
         if final_optimize:
             final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count)
         with torch.no_grad():
-            self.output_prob = parallel_reconstruct(self.params, args)
+            # print(batch_size)
+            self.output_prob = parallel_reconstruct(self.params, args, batch_size=batch_size)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
