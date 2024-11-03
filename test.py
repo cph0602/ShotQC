@@ -1,8 +1,25 @@
-import torch, random, itertools
-from time import perf_counter
-import torch
+# from helper_functions.utils import find_distinct_q_values
+# from qiskit import QuantumCircuit
 
-a = torch.tensor([[1.,2.,3.], [4.,5.,6.]], requires_grad=True)
-print(a[:,1:3])
-a[:,1:3] = a[:, 1:3] + torch.ones((2,2))
-print(a)
+# from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2 as Sampler
+# from qiskit.compiler import transpile
+ 
+# service = QiskitRuntimeService(
+#     channel='ibm_quantum',
+#     instance='ibm-q-hub-ntu/jiang-jie-hong/default',
+#     token='88213fbca00c9fe8ac6102df566e4e7bcafeb0854a3a44a4bf063d821c49536aad79823896bec4cd6f6eaca3261f49579dcd3f747a4130b2d11bfa109f80d8f2'
+# )
+# backend = service.least_busy(operational=True, simulator=False)
+
+
+# # Create a quantum circuit
+# qc = QuantumCircuit(2)
+# qc.h(0)  # Apply Hadamard gate to qubit 0
+# qc.cx(0, 1)  # Apply CNOT gate with control=0, target=1
+# qc.measure_all
+# sampler = Sampler(backend)
+# print(qc.cregs)
+# job = sampler.run(transpile([qc], backend))
+# print(f"job id: {job.job_id()}")
+# result = job.result()
+# print(result)

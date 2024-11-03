@@ -7,15 +7,17 @@ from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, params_matrix_to_list
 from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var
 from shotqc.parallel_overhead_v2 import (
-    Args, total_entry_coef, parallel_cost_function, parallel_reconstruct, 
+    parallel_cost_function, parallel_reconstruct, 
     parallel_variance, parallel_distribute
 )
+from shotqc.args import Args
 
 class ShotQC():
     """
     Main class for shotqc
     """
-    def __init__(self, subcircuits: List[QuantumCircuit] | None = None, name: str | None = None, verbose: bool = False, reset_files: bool = True):
+    def __init__(self, subcircuits: List[QuantumCircuit] | None = None, name: str | None = None, 
+                 verbose: bool = False, reset_files: bool = True, device=None):
         assert subcircuits != None, "Subcircuits cannot be empty"
         self.name = name
         self.subcircuits = subcircuits
@@ -25,6 +27,7 @@ class ShotQC():
         self.use_cut_params = True
         self.tmp_data_folder = "shotqc/tmp_data"
         self.reset_files = reset_files
+        self.device=device
         if os.path.exists(self.tmp_data_folder) and reset_files:
             subprocess.run(["rm", "-r", self.tmp_data_folder])
         if reset_files:
@@ -103,10 +106,14 @@ class ShotQC():
                     self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
 
 
-    def variance(self):
+    def variance(self, batch_size=1024):
         args = Args(self)
-        print("Theoretical Min. Variance: ", parallel_cost_function(self.params, args).item()**2/self.num_shots_given)
-        return parallel_variance(self.params, args, self.shot_count).item()
+        print(self.shot_count)
+        print(self.num_shots_given)
+        cost = parallel_cost_function(self.params, args, batch_size=batch_size).item()
+        print(cost)
+        print("Theoretical Min. Variance: ", cost**2/self.num_shots_given)
+        return parallel_variance(self.params, args, self.shot_count, batch_size=batch_size).item()
 
 
     def _optimize_params(self, method, prior=1, init_params=None, batch_size=1024):
@@ -115,7 +122,12 @@ class ShotQC():
         if init_params == None:
             init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
         args = Args(self, prior=prior)
-        opt_cost, self.params = parallel_optimize_params_sgd(init_params, args, batch_size=batch_size)
+        opt_cost, self.params = parallel_optimize_params_sgd(
+            init_params=init_params,
+            args=args,
+            device=self.device,
+            batch_size=batch_size
+        )
         if self.verbose:
             print("Optimized cost: ", opt_cost)
             print("Theoretical minimum variance: ", (opt_cost**2 / self.num_shots_given))

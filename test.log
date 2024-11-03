@@ -1,0 +1,5 @@
+/home/b10901076/miniconda3/envs/shotqc/lib/python3.12/site-packages/qiskit_ibm_runtime/utils/validations.py:40: UserWarning: The 0-th circuit has no output classical registers so the result will be empty. Did you mean to add measurement instructions?
+  warnings.warn(
+[]
+job id: cw9qcmj2802g0081nrf0
+PrimitiveResult([SamplerPubResult(data=DataBin(), metadata={'circuit_metadata': {}})], metadata={'execution': {'execution_spans': ExecutionSpans([])}, 'version': 2})

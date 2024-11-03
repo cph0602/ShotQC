@@ -1,0 +1,73 @@
+--> Generating subcircuit entries:
+Subcircuit 0 has 768 entries.
+Subcircuit 1 has 324 entries.
+--> Running Prior Samples
+--> Iteration 1: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/256 Completed, used 75.15850315010175 seconds
+-----> Batch 2/256 Completed, used 74.76459403708577 seconds
+-----> Batch 3/256 Completed, used 74.5861426172778 seconds
+-----> Batch 4/256 Completed, used 74.59005490597337 seconds
+-----> Batch 5/256 Completed, used 74.85572823928669 seconds
+-----> Batch 6/256 Completed, used 74.44125488540158 seconds
+-----> Batch 7/256 Completed, used 75.07841230602935 seconds
+-----> Batch 8/256 Completed, used 74.56434983806685 seconds
+-----> Batch 9/256 Completed, used 77.03056442923844 seconds
+-----> Batch 10/256 Completed, used 75.3940699659288 seconds
+-----> Batch 11/256 Completed, used 74.98369375988841 seconds
+-----> Batch 12/256 Completed, used 74.33957144105807 seconds
+-----> Batch 13/256 Completed, used 75.60678327269852 seconds
+-----> Batch 14/256 Completed, used 75.08145212195814 seconds
+-----> Batch 15/256 Completed, used 74.4435503766872 seconds
+-----> Batch 16/256 Completed, used 74.55353516340256 seconds
+-----> Batch 17/256 Completed, used 74.49309990089387 seconds
+-----> Batch 18/256 Completed, used 74.32427281187847 seconds
+-----> Batch 19/256 Completed, used 74.87504376191646 seconds
+-----> Batch 20/256 Completed, used 74.75176320411265 seconds
+-----> Batch 21/256 Completed, used 74.63474946422502 seconds
+-----> Batch 22/256 Completed, used 74.68552522594109 seconds
+-----> Batch 23/256 Completed, used 74.9426767830737 seconds
+-----> Batch 24/256 Completed, used 75.21879157004878 seconds
+-----> Batch 25/256 Completed, used 74.16154877888039 seconds
+-----> Batch 26/256 Completed, used 75.29129308508709 seconds
+-----> Batch 27/256 Completed, used 74.17203377000988 seconds
+-----> Batch 28/256 Completed, used 75.16360578685999 seconds
+-----> Batch 29/256 Completed, used 74.57572085084394 seconds
+-----> Batch 30/256 Completed, used 74.99507063627243 seconds
+-----> Batch 31/256 Completed, used 74.48018928570673 seconds
+-----> Batch 32/256 Completed, used 74.65914717968553 seconds
+-----> Batch 33/256 Completed, used 77.07520020706579 seconds
+-----> Batch 34/256 Completed, used 76.71848843293265 seconds
+-----> Batch 35/256 Completed, used 76.0352350845933 seconds
+-----> Batch 36/256 Completed, used 75.02745371730998 seconds
+-----> Batch 37/256 Completed, used 74.35962457489222 seconds
+-----> Batch 38/256 Completed, used 75.19175725709647 seconds
+-----> Batch 39/256 Completed, used 75.11364662321284 seconds
+-----> Batch 40/256 Completed, used 74.44211454270408 seconds
+-----> Batch 41/256 Completed, used 75.24751049559563 seconds
+-----> Batch 42/256 Completed, used 74.39586750464514 seconds
+-----> Batch 43/256 Completed, used 75.8810233050026 seconds
+-----> Batch 44/256 Completed, used 75.39011214999482 seconds
+-----> Batch 45/256 Completed, used 74.60343298688531 seconds
+-----> Batch 46/256 Completed, used 74.66098752664402 seconds
+-----> Batch 47/256 Completed, used 76.80752779124305 seconds
+-----> Batch 48/256 Completed, used 74.34166024206206 seconds
+-----> Batch 49/256 Completed, used 75.8420689208433 seconds
+-----> Batch 50/256 Completed, used 77.99176588235423 seconds
+-----> Batch 51/256 Completed, used 79.47193822963163 seconds
+-----> Batch 52/256 Completed, used 76.13718622690067 seconds
+-----> Batch 53/256 Completed, used 74.58240898838267 seconds
+-----> Batch 54/256 Completed, used 75.08378033991903 seconds
+-----> Batch 55/256 Completed, used 74.16724298894405 seconds
+-----> Batch 56/256 Completed, used 76.16409683227539 seconds
+-----> Batch 57/256 Completed, used 78.54668450821191 seconds
+-----> Batch 58/256 Completed, used 74.8846375150606 seconds
+-----> Batch 59/256 Completed, used 74.59121269825846 seconds
+-----> Batch 60/256 Completed, used 74.67910847021267 seconds
+-----> Batch 61/256 Completed, used 76.35917190695181 seconds
+-----> Batch 62/256 Completed, used 74.68658902775496 seconds
+-----> Batch 63/256 Completed, used 74.50990127772093 seconds
+-----> Batch 64/256 Completed, used 75.33558835601434 seconds
+-----> Batch 65/256 Completed, used 74.46761651104316 seconds
+-----> Batch 66/256 Completed, used 76.03058522613719 seconds

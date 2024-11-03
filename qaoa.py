@@ -1,7 +1,7 @@
 from qiskit import QuantumCircuit
 from qiskit.circuit import Instruction
 from shotqc.main import ShotQC
-from helper_functions.compare import ground_truth, squared_error
+from helper_functions.compare import ground_truth, squared_error, vector_ground_truth
 from helper_functions.ckt_cut import cut_circuit
 from testbench.qaoa import qaoa_circuit
 from math import pi

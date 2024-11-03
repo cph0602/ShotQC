@@ -1,0 +1,49 @@
+--> Generating subcircuit entries:
+Subcircuit 0 has 9 entries.
+Subcircuit 1 has 16 entries.
+--> Running Prior Samples
+--> Iteration 1: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/2 Completed, used 0.9385454040020704 seconds
+-----> Batch 2/2 Completed, used 0.9838287369348109 seconds
+-----> Running Samples
+--> Iteration 2: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/2 Completed, used 0.9265655679628253 seconds
+-----> Batch 2/2 Completed, used 0.9658295507542789 seconds
+-----> Running Samples
+--> Iteration 3: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/2 Completed, used 0.9387138020247221 seconds
+-----> Batch 2/2 Completed, used 1.003590207081288 seconds
+-----> Running Samples
+--> Iteration 4: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/2 Completed, used 1.0198193890973926 seconds
+-----> Batch 2/2 Completed, used 1.055556028150022 seconds
+-----> Running Samples
+--> Iteration 5: Running Posterior Samples
+-----> Reading data
+-----> Distributing Shots
+-----> Batch 1/2 Completed, used 0.9609257788397372 seconds
+-----> Batch 2/2 Completed, used 0.9407308427616954 seconds
+-----> Running Samples
+--> Building output probability
+-----> Reading data
+-----> Batch 1/2 Completed, used 0.4917501281015575 seconds
+-----> Batch 2/2 Completed, used 0.48730686912313104 seconds
+-----> Reading data
+[[1405.0, 1369.0, 1126.0, 1389.0, 1369.0, 1117.0, 1138.0, 1096.0, 956.0], [961.0, 981.0, 1025.0, 1028.0, 1071.0, 1075.0, 1118.0, 1146.0, 1378.0, 1515.0, 1741.0, 1720.0, 1164.0, 1302.0, 2036.0, 1711.0]]
+32000
+-----> Batch 1/2 Completed, used 0.9229842298664153 seconds
+-----> Batch 2/2 Completed, used 0.9638048349879682 seconds
+1.2787162065505981
+Theoretical Min. Variance:  5.10973480279735e-05
+-----> Batch 1/2 Completed, used 0.7861542347818613 seconds
+-----> Batch 2/2 Completed, used 0.8746546171605587 seconds
+Variance:  5.33659040229395e-05
+tensor(6.0992e-05, device='cuda:0', dtype=torch.float64)

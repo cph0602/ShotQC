@@ -39,17 +39,17 @@ sub1.append(PseudoQPD1Q("cut_3"), [4])
 sub1.append(PseudoQPD1Q("cut_4"), [9])
 
 subcircuits = [sub0, sub1]
-shotqc = ShotQC(subcircuits=subcircuits, name="mycircuit", verbose=True, reset_files=False)
+shotqc = ShotQC(subcircuits=subcircuits, name="mycircuit", verbose=True)
 shotqc.execute(
     num_shots_prior=100, 
     num_shots_total=1000000, 
     prep_states=[0,2,4,5], 
     use_params=False, 
     num_iter=1, 
-    batch_size=2**19, 
+    batch_size=2**17,
     distribe_shots=True
 )
-shotqc.reconstruct(batch_size=2**19)
+shotqc.reconstruct(batch_size=2**17)
 # print(shotqc.output_prob)
 # print("Variance: ", shotqc.variance())
 original_ckt = supremacy_25()
