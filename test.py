@@ -23,3 +23,6 @@
 # print(f"job id: {job.job_id()}")
 # result = job.result()
 # print(result)
+import torch
+a = torch.load("shotqc/tmp_data/subcircuit_0_entry_0.pt")
+print(a[a>1e-3])

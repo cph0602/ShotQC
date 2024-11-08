@@ -1,0 +1,1 @@
+nohup python3 example_regular.py > example_regular.out 2> example_regular.out.err &

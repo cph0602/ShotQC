@@ -1,0 +1,1 @@
+nohup python3 example_aqft.py > example_aqft.out 2> example_aqft.out.err &

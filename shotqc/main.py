@@ -4,7 +4,7 @@ from typing import List
 from math import floor
 from time import perf_counter
 from shotqc.executor import run_samples
-from shotqc.helper import initialize_counts, params_matrix_to_list
+from shotqc.helper import initialize_counts, auto_total_shot
 from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var
 from shotqc.parallel_overhead_v2 import (
     parallel_cost_function, parallel_reconstruct, 
@@ -22,7 +22,7 @@ class ShotQC():
         self.name = name
         self.subcircuits = subcircuits
         self.info = {}
-        self.extract_info()
+        self._extract_info()
         self.verbose = verbose
         self.use_cut_params = True
         self.tmp_data_folder = "shotqc/tmp_data"
@@ -34,22 +34,22 @@ class ShotQC():
             os.makedirs(self.tmp_data_folder)
 
 
-    def execute(self, num_shots_prior: int | None = 1024, num_shots_total: int | None = None, 
+    def execute(self, num_shots_prior: int | None = None, num_shots_total: int | None = None, prior_ratio: float | None = None,
                 num_iter: int = 1, prep_states: List[int] = range(6), run_mode: str = "qasm", 
-                use_params: bool = True, method: str = "SGD", prior: int = 1, distribe_shots: bool = True, 
-                debug: bool = False, batch_size: int = 1024):
+                use_params: bool = True, method: str = "SGD", prior: int = 0, distribe_shots: bool = True, 
+                debug: bool = False, batch_size: int = 1024, ext_ratio: float = 1):
         """
         Run circuits with optimal shot distribution and optimal cut parameters.
         run_mode = "qasm": classical simulator
         num_shots_prior: number of prior shots for each subcircuit
         num_shots_total: total number of shots
+        num_shots_ratio: automatic mode, determine the prior-posterior ratio
         num_iter: total iteration rounds
         """
         # Preparation Stage
         self.prep_states = prep_states
         self.prior = prior
         self.total_shots_run = 0
-        self.num_shots_given = num_shots_total
         if prep_states == [0,2,4,5]:
             self.num_params = 8
         elif prep_states == range(6):
@@ -60,7 +60,15 @@ class ShotQC():
         self._generate_subcircuit_entries()
         for i in range(self.info["num_subcircuits"]):
             print(f"Subcircuit {i} has {self.info["num_subcircuits_entries"][i]} entries.")
-        assert num_shots_prior*self.info["num_total_entries"] <= num_shots_total, f"Total number of prior shots({num_shots_prior*self.info["num_total_entries"]}) cannot exceed total shots({num_shots_total})."
+        if num_shots_total != None:
+            self.num_shots_given = num_shots_total
+            assert num_shots_prior*self.info["num_total_entries"] <= self.num_shots_given, f"Total number of prior shots({num_shots_prior*self.info["num_total_entries"]}) cannot exceed total shots({self.num_shots_given})."
+        else:
+            assert prior_ratio != None, f"Prior ratio must be specified when num_shots_total is not specified."
+            self.num_shots_given = auto_total_shot(self.subcircuits, self.subcircuits_info, 4) * ext_ratio
+            self.shot_ratio = self.num_shots_given / auto_total_shot(self.subcircuits, self.subcircuits_info, len(prep_states))
+            print(f"--> Total number of shots: {self.num_shots_given}")
+        
         
         # Begin execution
         self._initialize_shot_count()
@@ -85,34 +93,56 @@ class ShotQC():
             self._run_sv()
         # Runmode: baseline
         elif not distribe_shots:
-            self._run_prior_samples(floor(num_shots_total / self.info["num_total_entries"]))
+            if num_shots_total != None:
+                self._run_prior_samples(self.num_shots_given / self.info["num_total_entries"])
+            else:
+                self._run_prior_ratio_samples(1.0 * self.shot_ratio)
             self._generate_zero_params()
             return
         # Runmode: normal
         else:
-            # Runtime: running prior samples
-            self._run_prior_samples(num_shots_prior)
-            # Runtime: optimizae parameters
-            if use_params:
-                self._optimize_params(method=method, prior=prior, batch_size=batch_size)
+            if num_shots_total != None:
+                # Runtime: running prior samples
+                self._run_prior_samples(num_shots_prior)
+                # Runtime: optimizae parameters
+                if use_params:
+                    self._optimize_params(method=method, prior=prior, batch_size=batch_size)
+                else:
+                    self._generate_zero_params()
+                # Runtime: running posterior samples
+                num_shots_per_iter = (self.num_shots_given - num_shots_prior*self.info["num_total_entries"]) / num_iter
+                if num_shots_per_iter != 0:
+                    for round in range(num_iter):
+                        if self.verbose:
+                            print(f"--> Iteration {round +1}: Running Posterior Samples")
+                        self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
             else:
-                self._generate_zero_params()
-            # Runtime: running posterior samples
-            num_shots_per_iter = floor((num_shots_total - num_shots_prior*self.info["num_total_entries"]) / num_iter)
-            if num_shots_per_iter != 0:
-                for round in range(num_iter):
-                    if self.verbose:
-                        print(f"--> Iteration {round +1}: Running Posterior Samples")
-                    self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
+                # Runtime: running prior samples
+                self._run_prior_ratio_samples(prior_ratio * self.shot_ratio)
+                # Runtime: optimizae parameters
+                if use_params:
+                    self._optimize_params(method=method, prior=prior, batch_size=batch_size)
+                else:
+                    self._generate_zero_params()
+                # Runtime: running posterior samples
+                num_shots_per_iter = (self.num_shots_given * (1-prior_ratio)) / num_iter
+                if num_shots_per_iter != 0:
+                    for round in range(num_iter):
+                        if self.verbose:
+                            print(f"--> Iteration {round +1}: Running Posterior Samples")
+                        self._run_posterior_samples(num_shots_per_iter, batch_size=batch_size)
 
 
     def variance(self, batch_size=1024):
         args = Args(self)
-        print(self.shot_count)
-        print(self.num_shots_given)
+        actual_shot = 0
+        for subcircuit_idx in range(self.info["num_subcircuits"]):
+            for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
+                actual_shot += self.shot_count[subcircuit_idx][entry_idx]
+        print(f"Actual shots run: {actual_shot}")
         cost = parallel_cost_function(self.params, args, batch_size=batch_size).item()
-        print(cost)
         print("Theoretical Min. Variance: ", cost**2/self.num_shots_given)
+
         return parallel_variance(self.params, args, self.shot_count, batch_size=batch_size).item()
 
 
@@ -121,7 +151,7 @@ class ShotQC():
             print("--> Optimizing Parameters")
         if init_params == None:
             init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
-        args = Args(self, prior=prior)
+        args = Args(self, prior=prior, device=self.device)
         opt_cost, self.params = parallel_optimize_params_sgd(
             init_params=init_params,
             args=args,
@@ -137,12 +167,13 @@ class ShotQC():
         if self.verbose:
             print("--> Building output probability")
         # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
-        args = Args(self)
+        args = Args(self, device=self.device)
+        # print(parallel_variance(self.params, args, self.shot_count, batch_size=batch_size, device=self.device).item())
         if final_optimize:
-            final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count)
+            final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count, batch_size=batch_size, device=self.device)
         with torch.no_grad():
             # print(batch_size)
-            self.output_prob = parallel_reconstruct(self.params, args, batch_size=batch_size)
+            self.output_prob = parallel_reconstruct(self.params, args=args, batch_size=batch_size, device=self.device)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
@@ -159,6 +190,22 @@ class ShotQC():
         for subcircuit_idx in range(self.info["num_subcircuits"]):
             for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
                 self.shot_count[subcircuit_idx][entry_idx] += num_shots_prior
+    
+    def _run_prior_ratio_samples(self, prior_ratio: float):
+        if self.verbose:
+            print("--> Running Prior Samples")
+        distribution = [[max(1024, 2**self.subcircuits_info[subcircuit_idx]["num_qubits"]) * prior_ratio for entry_idx in range(self.info["num_subcircuits_entries"][subcircuit_idx])] for subcircuit_idx in range(self.info["num_subcircuits"])]
+        run_samples(
+            self.subcircuits,
+            self.subcircuits_entries,
+            "qasm",
+            "distribute",
+            distribution,
+            self.tmp_data_folder
+        )
+        for subcircuit_idx in range(self.info["num_subcircuits"]):
+            for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
+                self.shot_count[subcircuit_idx][entry_idx] += distribution[subcircuit_idx][entry_idx]
 
 
     def _run_sv(self):
@@ -224,7 +271,7 @@ class ShotQC():
         # print(self.subcircuits_entries)
 
 
-    def extract_info(self):
+    def _extract_info(self):
         self.info["cuts"] = {}
         """Cuts: dict[cut_label] = [index for measure, index for prepare]"""
         self.subcircuits_info = []

@@ -2,7 +2,9 @@ import random
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.dagcircuit.dagcircuit import DAGCircuit
 from qiskit import QuantumCircuit
-import itertools, os, subprocess, time, torch
+import itertools, os, subprocess, time, torch, copy
+import qiskit_aer as aer
+from qiskit.quantum_info import Statevector
 
 def scrambled(orig):
     dest = orig[:]
@@ -213,3 +215,23 @@ def advanced_indexing(tensor, indexes):
     indices = tuple(indexes[:, i] for i in range(indexes.shape[1]))
     result = tensor[indices]
     return result
+
+def auto_total_shot(subcircuits, subcircuit_info, k):
+    # k: the size of prep state set
+    total = 0
+    for subcircuit_idx, subcircuit in enumerate(subcircuits):
+        total += max(1024, 2**subcircuit.num_qubits)*(k ** subcircuit_info[subcircuit_idx]['counter']['rho']) * (3 ** subcircuit_info[subcircuit_idx]['counter']['O'])
+    return total
+
+def vector_ground_truth(original_circuit, mapping = None):
+    if mapping == None:
+        mapping = [i for i in range(original_circuit.num_qubits)]
+    qiskit_permute = [i for i in range(original_circuit.num_qubits)][::-1]
+    circuit = copy.deepcopy(original_circuit)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    simulator = aer.Aer.get_backend("statevector_simulator")
+    result = simulator.run(circuit).result()
+    statevector = result.get_statevector(circuit)
+    prob_vector = Statevector(statevector).probabilities()
+    truth = torch.tensor(prob_vector).view((2,)*original_circuit.num_qubits).permute(qiskit_permute).permute(tuple(mapping)).permute(qiskit_permute).flatten().to(device)
+    return truth

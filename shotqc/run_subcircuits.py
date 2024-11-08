@@ -5,6 +5,7 @@ import qiskit_aer as aer
 import copy, psutil, os, itertools, torch
 import numpy as np
 from qiskit.quantum_info import Statevector
+from math import floor
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
@@ -48,7 +49,7 @@ if __name__ == "__main__":
             statevector = result.get_statevector(circuit)
             prob_vector = Statevector(statevector).probabilities()
             probs = torch.tensor(prob_vector).view((2,)*subcircuit.num_qubits)
-            torch.save(previous_counts, f'{args.data_folder}/subcircuit_{subcircuit_idx}_entry_{job}.pt')
+            torch.save(probs, f'{args.data_folder}/subcircuit_{subcircuit_idx}_entry_{job}.pt')
         else:
             raise Exception("Run mode not supported")
 

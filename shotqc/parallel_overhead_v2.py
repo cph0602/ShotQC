@@ -58,7 +58,7 @@ def total_entry_coef(params, args, device=None, batch_size=1024, verbose=True):
         start_time = perf_counter()
         # Calculate prob_coef
         this_batch_size = batch.shape[0]
-        this_total_value = torch.zeros(this_batch_size, device=device)
+        # this_total_value = torch.zeros(this_batch_size, device=device)
         prob_coef = [
             torch.zeros((this_batch_size,args.num_entries[subcircuit_idx])+(2,)*args.num_meas[subcircuit_idx],
             requires_grad=True, device=device)
@@ -76,7 +76,7 @@ def total_entry_coef(params, args, device=None, batch_size=1024, verbose=True):
                 subcircuit_values.append(subcircuit_value)
                 config_prob_coef.append(lined_prob_coef) # this stores each cut outcome for a number of entries.
                 value = value * subcircuit_value
-            this_total_value = this_total_value + value
+            # this_total_value = this_total_value + value
             subcircuit_values = torch.stack(subcircuit_values)
             product_except_self = [torch.ones(this_batch_size, device=device) for subcircuit_idx in range(args.num_subcircuits)]
             # print(config_prob_coef[1])
@@ -134,6 +134,7 @@ def total_entry_coef(params, args, device=None, batch_size=1024, verbose=True):
                 del variance
                 del subcircuit_bitstrings
                 del permuted_probs
+                del indices, padded_permute_order
         if verbose:
             print(f"-----> Batch {batch_cnt+1}/{num_batch} Completed, used {perf_counter()-start_time} seconds")
         batch_cnt += 1

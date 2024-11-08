@@ -63,10 +63,12 @@ class Args:
         entry_probs = []
         for subcircuit_idx in range(self.num_subcircuits):
             subcircuit_entry_probs = []
+            num_qubits = self.subcircuits[subcircuit_idx].num_qubits
             for entry_idx in range(len(list(self.entry_dict[subcircuit_idx]))):
                 entry_count = torch.load(f'{self.data_folder}/subcircuit_{subcircuit_idx}_entry_{entry_idx}.pt', weights_only=True)
                 qiskit_permute_order = [i for i in range(self.subcircuit_num_qubits[subcircuit_idx])][::-1]
                 entry_count = entry_count.permute(tuple(qiskit_permute_order))
+                entry_count = entry_count + torch.ones_like(entry_count) * (prior / (2**num_qubits))
                 subcircuit_entry_probs.append(entry_count / torch.sum(entry_count))
             entry_probs.append(torch.stack(subcircuit_entry_probs).to(self.device))
         self.entry_probs = entry_probs

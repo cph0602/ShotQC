@@ -43,5 +43,5 @@ shotqc.execute(
 shotqc.reconstruct()
 # print(shotqc.output_prob)
 print("Variance: ", shotqc.variance())
-print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))
+# print("Squared_error: ", squared_error(shotqc.output_prob, ground_truth))
 # print(ground_truth)

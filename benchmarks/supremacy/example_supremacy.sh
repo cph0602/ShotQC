@@ -1,0 +1,1 @@
+nohup python3 example_supremacy.py > example_supremacy.out 2> example_supremacy.out.err &
