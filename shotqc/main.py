@@ -5,7 +5,7 @@ from math import floor
 from time import perf_counter
 from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, auto_total_shot
-from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var
+from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var, batch_optimize_params
 from shotqc.parallel_overhead_v2 import (
     parallel_cost_function, parallel_reconstruct, 
     parallel_variance, parallel_distribute
@@ -152,7 +152,7 @@ class ShotQC():
         if init_params == None:
             init_params = torch.zeros(self.info["num_cuts"] * self.num_params, requires_grad=True)
         args = Args(self, prior=prior, device=self.device)
-        opt_cost, self.params = parallel_optimize_params_sgd(
+        opt_cost, self.params = batch_optimize_params(
             init_params=init_params,
             args=args,
             device=self.device,
@@ -164,13 +164,14 @@ class ShotQC():
     
 
     def reconstruct(self, final_optimize=False, batch_size=1024):
-        if self.verbose:
-            print("--> Building output probability")
-        # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
         args = Args(self, device=self.device)
         # print(parallel_variance(self.params, args, self.shot_count, batch_size=batch_size, device=self.device).item())
         if final_optimize:
+            print("--> Optimizing final variance")
             final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count, batch_size=batch_size, device=self.device)
+        if self.verbose:
+            print("--> Building output probability")
+        # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
         with torch.no_grad():
             # print(batch_size)
             self.output_prob = parallel_reconstruct(self.params, args=args, batch_size=batch_size, device=self.device)

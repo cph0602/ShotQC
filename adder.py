@@ -25,7 +25,7 @@ import importlib.util
 # mapping = [i for i in range(20)]
 # subcircuits = [sub0, sub1]
 circuit_type = "adder"
-num_qubits = 22
+num_qubits = 24
 num_subcircuits = 2
 
 spec = importlib.util.spec_from_file_location("config_file", f'benchmarks/{circuit_type}/config.py')
@@ -61,12 +61,12 @@ shotqc.execute(
     prep_states=range(6),
     use_params=True,
     num_iter=1,
-    batch_size=2**22,
+    batch_size=2**21,
     distribe_shots=True,
     ext_ratio=1
 )
-shotqc.reconstruct(batch_size=2**14, final_optimize=False)
-print("Variance: ", shotqc.variance(batch_size=2**14))
+shotqc.reconstruct(batch_size=2**21, final_optimize=False)
+print("Variance: ", shotqc.variance(batch_size=2**21))
 truth = vector_ground_truth(org_ckt, mapping)
 result = torch.load('shotqc/tmp_data/output_tensor.pt', weights_only=True)
 squ_error = torch.sum(torch.square(truth-result))

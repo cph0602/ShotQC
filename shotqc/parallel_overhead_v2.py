@@ -56,6 +56,7 @@ def total_entry_coef(params, args, device=None, batch_size=1024, verbose=True):
     num_batch = ceil(2**args.num_qubits/batch_size)
     for batch in bitstring_batch_generator(args.num_qubits, batch_size):
         start_time = perf_counter()
+        # print("Memory allocated: ", torch.cuda.memory_allocated())
         # Calculate prob_coef
         this_batch_size = batch.shape[0]
         # this_total_value = torch.zeros(this_batch_size, device=device)
@@ -235,3 +236,106 @@ def parallel_reconstruct(params, args, device=None, batch_size=1024, ext_save=Tr
         result[bitstring] = total_values[idx].item()
         idx += 1
     return result
+
+def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    ## main
+    params = params.to(device)
+    params_matrix = params_list_to_matrix(params, args.prep_states)
+    coef_matrix = generate_matrix(params_matrix, args.prep_states)
+    # print(coef_matrix)
+    with torch.no_grad():
+        entry_coef = total_entry_coef(
+            params=params,
+            args=args,
+            device=device,
+            batch_size=batch_size,
+            verbose=False
+        )
+    batch_entry_coef = [torch.zeros(args.num_entries[subcircuit_idx], device=device) for subcircuit_idx in range(args.num_subcircuits)]
+    # print("Memory allocated: ", torch.cuda.memory_allocated())
+    # Calculate prob_coef
+    this_batch_size = batch.shape[0]
+    # this_total_value = torch.zeros(this_batch_size, device=device)
+    prob_coef = [
+        torch.zeros((this_batch_size,args.num_entries[subcircuit_idx])+(2,)*args.num_meas[subcircuit_idx],
+        requires_grad=True, device=device)
+        for subcircuit_idx in range(args.num_subcircuits)
+    ] # size = batch_size * num_entries * 2**num_meas
+    for prep_config in itertools.product(range(args.len_prep_states), repeat=args.num_cuts):
+        value = torch.ones(this_batch_size, device=device)
+        subcircuit_values = []
+        config_prob_coef = []
+        for subcircuit_idx in range(args.num_subcircuits):
+            # going through a batch of entries
+            subcircuit_value, lined_prob_coef = calc_subcircuit_value(
+                coef_matrix, args, batch, prep_config, subcircuit_idx, device
+            )
+            subcircuit_values.append(subcircuit_value)
+            config_prob_coef.append(lined_prob_coef) # this stores each cut outcome for a number of entries.
+            value = value * subcircuit_value
+        # this_total_value = this_total_value + value
+        subcircuit_values = torch.stack(subcircuit_values)
+        product_except_self = [torch.ones(this_batch_size, device=device) for subcircuit_idx in range(args.num_subcircuits)]
+        # print(config_prob_coef[1])
+        for subcircuit_idx in range(args.num_subcircuits):
+            mask = torch.ones(args.num_subcircuits, dtype=bool)
+            mask[subcircuit_idx] = False
+            product_except_self[subcircuit_idx] = torch.prod(subcircuit_values[mask], dim=0) #(batch_size)
+            # if subcircuit_idx == 1:
+            #     print(product_except_self[subcircuit_idx])
+            # print(config_prob_coef[subcircuit_idx].shape)
+            base_local_entry_idx = 0
+            for prep_cut in args.prep_cuts[subcircuit_idx]:
+                base_local_entry_idx *= args.len_prep_states
+                base_local_entry_idx += prep_config[prep_cut]
+            base_local_entry_idx *= 3**args.num_meas[subcircuit_idx]
+            container = torch.zeros_like(prob_coef[subcircuit_idx])
+            container[:, base_local_entry_idx:base_local_entry_idx+3**args.num_meas[subcircuit_idx]] = torch.outer(product_except_self[subcircuit_idx], config_prob_coef[subcircuit_idx].flatten()).reshape((this_batch_size,)+config_prob_coef[subcircuit_idx].shape)
+            # print(container[:,base_local_entry_idx:base_local_entry_idx+3**args.num_meas[subcircuit_idx]])
+            prob_coef[subcircuit_idx] = prob_coef[subcircuit_idx] + container
+            del container
+        del config_prob_coef
+        del product_except_self
+        del subcircuit_values
+        del lined_prob_coef
+        del value
+    # total_values = torch.cat((total_values, this_total_value))
+    # print(f"--------> Calculate took: {perf_counter()-start_time} seconds")
+    # Calculate variance
+    for subcircuit_idx in range(args.num_subcircuits):
+        num_meas = args.num_meas[subcircuit_idx]
+        for entry_idx in range(args.num_entries[subcircuit_idx]):
+            # 1. Self variance
+            subcircuit_bitstrings = torch.flip(batch, dims=[1])[:, args.acc_eff_qubits[subcircuit_idx]:args.acc_eff_qubits[subcircuit_idx+1]]
+            indices = tuple(subcircuit_bitstrings[:, i] for i in range(subcircuit_bitstrings.shape[1]))
+            padded_permute_order = args.permute_orders[subcircuit_idx]
+            permuted_probs = torch.permute(args.entry_probs[subcircuit_idx][entry_idx], tuple(padded_permute_order)).contiguous()
+            self_probs = permuted_probs[indices]
+            one_minus_probs = torch.ones_like(self_probs, requires_grad=True) - self_probs
+            self_coefs = prob_coef[subcircuit_idx][:, entry_idx]
+            # print(self_coefs)
+            variance = torch.sum(self_probs*one_minus_probs*self_coefs*self_coefs, dim=tuple(range(1,num_meas+1)))
+            # print(variance)
+            # 2. Covariance
+            #   (a) Find all relative bitstrings
+            if num_meas != 0:
+                outer_probs = self_probs.view(this_batch_size, -1, 1) * self_probs.view(this_batch_size, 1, -1)
+                outer_coefs = self_coefs.view(this_batch_size, -1, 1) * self_coefs.view(this_batch_size, 1, -1)
+                covariance = torch.sum(self_probs*self_probs*self_coefs*self_coefs, dim=tuple(range(1,num_meas+1))) - torch.sum(outer_coefs*outer_probs, dim=(1,2))
+                batch_entry_coef[subcircuit_idx][entry_idx] = batch_entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance + covariance)
+                del outer_coefs, outer_probs, covariance
+            else:
+                batch_entry_coef[subcircuit_idx][entry_idx] = batch_entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance)
+            del self_coefs, self_probs
+            del one_minus_probs
+            del variance
+            del subcircuit_bitstrings
+            del permuted_probs
+            del indices, padded_permute_order
+    del prob_coef
+    cost = torch.tensor(0., requires_grad=True, device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        cost = cost + torch.sum(batch_entry_coef[subcircuit_idx]/(2*torch.sqrt(torch.clamp(entry_coef[subcircuit_idx], min=1e-8))))
+    return cost
