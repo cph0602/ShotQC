@@ -28,6 +28,7 @@ def squared_error(output_prob, ground_truth):
 def vector_ground_truth(original_circuit, mapping = None, device=None):
     if mapping == None:
         mapping = [i for i in range(original_circuit.num_qubits)]
+    reversed_mapping = [mapping.index(i) for i in range(len(mapping))]
     qiskit_permute = [i for i in range(original_circuit.num_qubits)][::-1]
     circuit = copy.deepcopy(original_circuit)
     if device == None:
@@ -36,5 +37,5 @@ def vector_ground_truth(original_circuit, mapping = None, device=None):
     result = simulator.run(circuit).result()
     statevector = result.get_statevector(circuit)
     prob_vector = Statevector(statevector).probabilities()
-    truth = torch.tensor(prob_vector).view((2,)*original_circuit.num_qubits).permute(qiskit_permute).permute(tuple(mapping)).permute(qiskit_permute).flatten().to(device)
+    truth = torch.tensor(prob_vector).view((2,)*original_circuit.num_qubits).permute(qiskit_permute).permute(tuple(reversed_mapping)).permute(qiskit_permute).flatten().to(device)
     return truth
