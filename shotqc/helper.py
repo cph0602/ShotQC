@@ -165,7 +165,6 @@ def tensor_product(tensors, device):
     for i in range(n-1):
         temp = tensors[i+1].view(tuple(indices[i+1].tolist()))
         product = product * temp
-        print(product)
     return product
 
 def find_slices(bitstrings, m_cuts_loc):

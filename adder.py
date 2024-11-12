@@ -1,32 +1,15 @@
 from qiskit import QuantumCircuit
-from qiskit.circuit import Instruction
 from shotqc.main import ShotQC
-from helper_functions.compare import ground_truth, squared_error, vector_ground_truth
-from helper_functions.ckt_cut import cut_circuit
+from helper_functions.compare import vector_ground_truth
 from helper_functions.helper_instr import PseudoQPD1Q
-from testbench.qaoa import qaoa_circuit
-from math import pi
-import numpy as np
-import networkx as nx
-from itertools import product, combinations
-from testbench.adder import adder20, adder20_0, adder20_1
 import torch
 import importlib.util
 
-# org_ckt = adder20()
-# sub0_prepend = QuantumCircuit(12)
-# sub0_prepend.append(PseudoQPD1Q("cut_0"), [11])
-# sub0 = sub0_prepend.compose(adder20_0())
-# sub0.append(PseudoQPD1Q("cut_1"), [10])
-# sub1_prepend = QuantumCircuit(10)
-# sub1_prepend.append(PseudoQPD1Q("cut_1"), [0])
-# sub1 = sub1_prepend.compose(adder20_1())
-# sub1.append(PseudoQPD1Q("cut_0"), [0])
-# mapping = [i for i in range(20)]
-# subcircuits = [sub0, sub1]
-circuit_type = "adder"
-num_qubits = 24
+circuit_type = "aqft"
+num_qubits = 13
 num_subcircuits = 2
+name = "aqft_1"
+device = "cuda:1"
 
 spec = importlib.util.spec_from_file_location("config_file", f'benchmarks/{circuit_type}/config.py')
 module = importlib.util.module_from_spec(spec)
@@ -52,8 +35,9 @@ for idx in range(num_subcircuits):
 
 shotqc = ShotQC(
     subcircuits=subcircuits, 
-    name="mycircuit", 
-    verbose=True
+    name=name, 
+    verbose=True,
+    device=device
 )
 # shotqc.print_info()
 shotqc.execute(
@@ -61,13 +45,14 @@ shotqc.execute(
     prep_states=range(6),
     use_params=True,
     num_iter=1,
-    batch_size=2**21,
+    batch_size=2**10,
     distribe_shots=True,
-    ext_ratio=1
+    ext_ratio=10
 )
-shotqc.reconstruct(batch_size=2**21, final_optimize=False)
-print("Variance: ", shotqc.variance(batch_size=2**21))
-truth = vector_ground_truth(org_ckt, mapping)
-result = torch.load('shotqc/tmp_data/output_tensor.pt', weights_only=True)
+shotqc.reconstruct(batch_size=2**15, final_optimize=False)
+print("Variance: ", shotqc.variance(batch_size=2**15))
+truth = vector_ground_truth(org_ckt, mapping, device)
+result = torch.load(f'shotqc/{name}_tmp_data/output_tensor.pt', weights_only=True)
 squ_error = torch.sum(torch.square(truth-result))
 print(squ_error)
+print(result)

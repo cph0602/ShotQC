@@ -5,7 +5,7 @@ from math import floor
 from time import perf_counter
 from shotqc.executor import run_samples
 from shotqc.helper import initialize_counts, auto_total_shot
-from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var, batch_optimize_params
+from shotqc.optimizer import parallel_optimize_params_sgd, parallel_minimize_var, batch_optimize_params, batch_minimize_var
 from shotqc.parallel_overhead_v2 import (
     parallel_cost_function, parallel_reconstruct, 
     parallel_variance, parallel_distribute
@@ -25,7 +25,7 @@ class ShotQC():
         self._extract_info()
         self.verbose = verbose
         self.use_cut_params = True
-        self.tmp_data_folder = "shotqc/tmp_data"
+        self.tmp_data_folder = f"shotqc/{name}_tmp_data"
         self.reset_files = reset_files
         self.device=device
         if os.path.exists(self.tmp_data_folder) and reset_files:
@@ -134,16 +134,17 @@ class ShotQC():
 
 
     def variance(self, batch_size=1024):
-        args = Args(self)
+        args = Args(self, device=self.device)
         actual_shot = 0
         for subcircuit_idx in range(self.info["num_subcircuits"]):
             for entry_idx in range(len(self.subcircuits_entries[subcircuit_idx])):
                 actual_shot += self.shot_count[subcircuit_idx][entry_idx]
         print(f"Actual shots run: {actual_shot}")
-        cost = parallel_cost_function(self.params, args, batch_size=batch_size).item()
-        print("Theoretical Min. Variance: ", cost**2/self.num_shots_given)
-
-        return parallel_variance(self.params, args, self.shot_count, batch_size=batch_size).item()
+        # cost = parallel_cost_function(self.params, args, batch_size=batch_size).item()
+        # print("Theoretical Min. Variance: ", cost**2/self.num_shots_given)
+        with torch.no_grad():
+            variance = parallel_variance(self.params, args, self.shot_count, device=self.device, batch_size=batch_size).item()
+        return variance
 
 
     def _optimize_params(self, method, prior=1, init_params=None, batch_size=1024):
@@ -168,13 +169,13 @@ class ShotQC():
         # print(parallel_variance(self.params, args, self.shot_count, batch_size=batch_size, device=self.device).item())
         if final_optimize:
             print("--> Optimizing final variance")
-            final_var, self.params = parallel_minimize_var(self.params, args, self.shot_count, batch_size=batch_size, device=self.device)
+            final_var, self.params = batch_minimize_var(self.params, args, self.shot_count, batch_size=batch_size, device=self.device)
         if self.verbose:
             print("--> Building output probability")
         # self.output_prob = postprocess(self.tmp_data_folder, self.info, self.subcircuits_info, self.prep_states, torch.tensor(self.params))
         with torch.no_grad():
             # print(batch_size)
-            self.output_prob = parallel_reconstruct(self.params, args=args, batch_size=batch_size, device=self.device)
+            parallel_reconstruct(self.params, args=args, batch_size=batch_size, device=self.device)
 
 
     def _run_prior_samples(self, num_shots_prior: int):
@@ -223,10 +224,10 @@ class ShotQC():
 
 
     def _run_posterior_samples(self, total_samples, batch_size):
-        args = Args(self)
+        args = Args(self, device=self.device)
         if self.verbose:
             print("-----> Distributing Shots")
-        distribution = parallel_distribute(self.params, args, total_samples, batch_size=batch_size)
+        distribution = parallel_distribute(self.params, args=args, total_samples=total_samples, device=self.device, batch_size=batch_size)
         if self.verbose:
             print("-----> Running Samples")
         run_samples(

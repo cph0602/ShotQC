@@ -142,102 +142,7 @@ def total_entry_coef(params, args, device=None, batch_size=1024, verbose=True):
         del prob_coef
     return entry_coef
 
-def parallel_cost_function(params, args, device=None, batch_size=1024, verbose=False):
-    if device == None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    entry_coef = total_entry_coef(
-        params=params,
-        args=args,
-        device=device,
-        batch_size=batch_size,
-        verbose=verbose
-    )
-    cost = torch.tensor(0., requires_grad=True, device=device)
-    for subcircuit_idx in range(args.num_subcircuits):
-        cost = cost + torch.sum(torch.sqrt(torch.clamp(entry_coef[subcircuit_idx], min=1e-8)))
-    return cost
-
-def parallel_distribute(params, args, total_samples, device=None, batch_size=1024, verbose=True):
-    if device == None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    with torch.no_grad():
-        entry_coef = total_entry_coef(
-            params=params, 
-            args=args,
-            device=device,
-            batch_size=batch_size,
-            verbose=verbose
-        )
-    total_cost = torch.tensor(0., device=device)
-    for subcircuit_idx in range(args.num_subcircuits):
-        total_cost = total_cost + torch.sum(torch.sqrt(entry_coef[subcircuit_idx]))
-    distributions = []
-    sample = torch.tensor(total_samples, device=device)
-    for subcircuit_idx in range(args.num_subcircuits):
-        subcircuit_distribution = torch.floor(sample * torch.sqrt(entry_coef[subcircuit_idx]) / total_cost)
-        distributions.append(subcircuit_distribution.tolist())
-    # print(distributions)
-    return distributions
-
-def parallel_variance(params, args, shot_count, device=None, batch_size=1024, verbose=True):
-    if device == None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    entry_coef = total_entry_coef(
-        params=params,
-        args=args,
-        device=device,
-        batch_size=batch_size,
-        verbose=verbose
-    )
-    var = torch.tensor(0., requires_grad=True, device=device)
-    for subcircuit_idx in range(args.num_subcircuits):
-        temp = torch.tensor(shot_count[subcircuit_idx], device=device)
-        var = var + torch.sum(entry_coef[subcircuit_idx] / temp)
-    return var
-
-def parallel_reconstruct(params, args, device=None, batch_size=1024, ext_save=True, verbose=True):
-    # print(batch_size)
-    if device == None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    ## main
-    params = params.to(device)
-    params_matrix = params_list_to_matrix(params, args.prep_states)
-    coef_matrix = generate_matrix(params_matrix, args.prep_states)
-    # total_values = torch.tensor([], device=device) # for reconstructing
-    batch_cnt = 0
-    num_batch = ceil(2**args.num_qubits/batch_size)
-    total_values = torch.tensor([], device=device)
-    for batch in bitstring_batch_generator(args.num_qubits, batch_size):
-        start_time = perf_counter()
-        # Calculate prob_coef
-        this_batch_size = batch.shape[0]
-        this_total_value = torch.zeros(this_batch_size, device=device)
-        for prep_config in itertools.product(range(args.len_prep_states), repeat=args.num_cuts):
-            value = torch.ones(this_batch_size, device=device)
-            for subcircuit_idx in range(args.num_subcircuits):
-                # going through a batch of entries
-                subcircuit_value, lined_prob_coef = calc_subcircuit_value(
-                    coef_matrix, args, batch, prep_config, subcircuit_idx, device
-                )
-                value = value * subcircuit_value
-            this_total_value = this_total_value + value
-            del lined_prob_coef
-            del subcircuit_value
-            del value
-        total_values = torch.cat((total_values, this_total_value))
-        if verbose:
-            print(f"-----> Batch {batch_cnt+1}/{num_batch} Completed, used {perf_counter()-start_time} seconds")
-        batch_cnt += 1
-    result = {}
-    idx = 0
-    torch.save(total_values, f'{args.data_folder}/output_tensor.pt')
-    for bittuple in itertools.product("01", repeat=args.num_qubits):
-        bitstring = ''.join(bittuple)
-        result[bitstring] = total_values[idx].item()
-        idx += 1
-    return result
-
-def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
+def batch_entry_coef(params, args, batch, device=None):
     if device == None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ## main
@@ -245,15 +150,8 @@ def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
     params_matrix = params_list_to_matrix(params, args.prep_states)
     coef_matrix = generate_matrix(params_matrix, args.prep_states)
     # print(coef_matrix)
-    with torch.no_grad():
-        entry_coef = total_entry_coef(
-            params=params,
-            args=args,
-            device=device,
-            batch_size=batch_size,
-            verbose=False
-        )
-    batch_entry_coef = [torch.zeros(args.num_entries[subcircuit_idx], device=device) for subcircuit_idx in range(args.num_subcircuits)]
+    entry_coef = [torch.zeros(args.num_entries[subcircuit_idx], device=device) for subcircuit_idx in range(args.num_subcircuits)]
+    # total_values = torch.tensor([], device=device) # for reconstructing
     # print("Memory allocated: ", torch.cuda.memory_allocated())
     # Calculate prob_coef
     this_batch_size = batch.shape[0]
@@ -324,10 +222,10 @@ def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
                 outer_probs = self_probs.view(this_batch_size, -1, 1) * self_probs.view(this_batch_size, 1, -1)
                 outer_coefs = self_coefs.view(this_batch_size, -1, 1) * self_coefs.view(this_batch_size, 1, -1)
                 covariance = torch.sum(self_probs*self_probs*self_coefs*self_coefs, dim=tuple(range(1,num_meas+1))) - torch.sum(outer_coefs*outer_probs, dim=(1,2))
-                batch_entry_coef[subcircuit_idx][entry_idx] = batch_entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance + covariance)
+                entry_coef[subcircuit_idx][entry_idx] = entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance + covariance)
                 del outer_coefs, outer_probs, covariance
             else:
-                batch_entry_coef[subcircuit_idx][entry_idx] = batch_entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance)
+                entry_coef[subcircuit_idx][entry_idx] = entry_coef[subcircuit_idx][entry_idx] + torch.sum(variance)
             del self_coefs, self_probs
             del one_minus_probs
             del variance
@@ -335,7 +233,137 @@ def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
             del permuted_probs
             del indices, padded_permute_order
     del prob_coef
+    return entry_coef
+
+def parallel_cost_function(params, args, device=None, batch_size=1024, verbose=False):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    entry_coef = total_entry_coef(
+        params=params,
+        args=args,
+        device=device,
+        batch_size=batch_size,
+        verbose=verbose
+    )
     cost = torch.tensor(0., requires_grad=True, device=device)
     for subcircuit_idx in range(args.num_subcircuits):
-        cost = cost + torch.sum(batch_entry_coef[subcircuit_idx]/(2*torch.sqrt(torch.clamp(entry_coef[subcircuit_idx], min=1e-8))))
+        cost = cost + torch.sum(torch.sqrt(torch.clamp(entry_coef[subcircuit_idx], min=1e-8)))
+    return cost
+
+def parallel_distribute(params, args, total_samples, device=None, batch_size=1024, verbose=True):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    with torch.no_grad():
+        entry_coef = total_entry_coef(
+            params=params, 
+            args=args,
+            device=device,
+            batch_size=batch_size,
+            verbose=verbose
+        )
+    total_cost = torch.tensor(0., device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        total_cost = total_cost + torch.sum(torch.sqrt(entry_coef[subcircuit_idx]))
+    distributions = []
+    sample = torch.tensor(total_samples, device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        subcircuit_distribution = torch.floor(sample * torch.sqrt(entry_coef[subcircuit_idx]) / total_cost)
+        distributions.append(subcircuit_distribution.tolist())
+    # print(distributions)
+    return distributions
+
+def parallel_variance(params, args, shot_count, device=None, batch_size=1024, verbose=True):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    entry_coef = total_entry_coef(
+        params=params,
+        args=args,
+        device=device,
+        batch_size=batch_size,
+        verbose=verbose
+    )
+    var = torch.tensor(0., requires_grad=True, device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        temp = torch.tensor(shot_count[subcircuit_idx], device=device)
+        var = var + torch.sum(entry_coef[subcircuit_idx] / temp)
+    return var
+
+def batch_variance(params, args, shot_count, batch, device=None):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    entry_coef = batch_entry_coef(
+        params=params,
+        args=args,
+        batch=batch,
+        device=device
+    )
+    var = torch.tensor(0., requires_grad=True, device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        temp = torch.tensor(shot_count[subcircuit_idx], device=device)
+        var = var + torch.sum(entry_coef[subcircuit_idx] / temp)
+    return var
+
+def parallel_reconstruct(params, args, device=None, batch_size=1024, ext_save=True, verbose=True):
+    # print(batch_size)
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    ## main
+    params = params.to(device)
+    params_matrix = params_list_to_matrix(params, args.prep_states)
+    coef_matrix = generate_matrix(params_matrix, args.prep_states)
+    # total_values = torch.tensor([], device=device) # for reconstructing
+    batch_cnt = 0
+    num_batch = ceil(2**args.num_qubits/batch_size)
+    total_values = torch.tensor([], device=device)
+    for batch in bitstring_batch_generator(args.num_qubits, batch_size):
+        start_time = perf_counter()
+        # Calculate prob_coef
+        this_batch_size = batch.shape[0]
+        this_total_value = torch.zeros(this_batch_size, device=device)
+        for prep_config in itertools.product(range(args.len_prep_states), repeat=args.num_cuts):
+            value = torch.ones(this_batch_size, device=device)
+            for subcircuit_idx in range(args.num_subcircuits):
+                # going through a batch of entries
+                subcircuit_value, lined_prob_coef = calc_subcircuit_value(
+                    coef_matrix, args, batch, prep_config, subcircuit_idx, device
+                )
+                value = value * subcircuit_value
+            this_total_value = this_total_value + value
+            del lined_prob_coef
+            del subcircuit_value
+            del value
+        total_values = torch.cat((total_values, this_total_value))
+        if verbose:
+            print(f"-----> Batch {batch_cnt+1}/{num_batch} Completed, used {perf_counter()-start_time} seconds")
+        batch_cnt += 1
+    result = {}
+    idx = 0
+    torch.save(total_values, f'{args.data_folder}/output_tensor.pt')
+    # for bittuple in itertools.product("01", repeat=args.num_qubits):
+    #     bitstring = ''.join(bittuple)
+    #     result[bitstring] = total_values[idx].item()
+    #     idx += 1
+    # return result
+
+def batch_loss(params, args, batch, device=None, batch_size=1024, verbose=True):
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # print(coef_matrix)
+    with torch.no_grad():
+        entry_coef = total_entry_coef(
+            params=params,
+            args=args,
+            device=device,
+            batch_size=batch_size,
+            verbose=False
+        )
+    current_entry_coef = batch_entry_coef(
+        params=params,
+        args=args,
+        batch=batch,
+        device=device
+    )
+    cost = torch.tensor(0., requires_grad=True, device=device)
+    for subcircuit_idx in range(args.num_subcircuits):
+        cost = cost + torch.sum(current_entry_coef[subcircuit_idx]/(2*torch.sqrt(torch.clamp(entry_coef[subcircuit_idx], min=1e-8))))
     return cost

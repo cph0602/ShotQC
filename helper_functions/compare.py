@@ -25,12 +25,13 @@ def squared_error(output_prob, ground_truth):
         error += (output_prob[key] - ground_truth[key])**2
     return error
 
-def vector_ground_truth(original_circuit, mapping = None):
+def vector_ground_truth(original_circuit, mapping = None, device=None):
     if mapping == None:
         mapping = [i for i in range(original_circuit.num_qubits)]
     qiskit_permute = [i for i in range(original_circuit.num_qubits)][::-1]
     circuit = copy.deepcopy(original_circuit)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if device == None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     simulator = aer.Aer.get_backend("statevector_simulator")
     result = simulator.run(circuit).result()
     statevector = result.get_statevector(circuit)
