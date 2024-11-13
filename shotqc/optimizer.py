@@ -88,7 +88,7 @@ def batch_optimize_params(init_params, args, lr=0.1, num_iterations=100, device=
 def batch_minimize_var(init_params, args, shot_count, lr=0.1, num_iterations=100, device=None, batch_size=1024):
     params = init_params.clone().detach().requires_grad_(True)
     optimizer = optim.Adam([params], lr=lr)
-    scheduler = MultiStepLR(optimizer, milestones=[40,90], gamma=0.1)
+    scheduler = MultiStepLR(optimizer, milestones=[70], gamma=0.1)
     for i in range(num_iterations):
         iter_start = perf_counter()
         optimizer.zero_grad()  # Clear previous gradients
